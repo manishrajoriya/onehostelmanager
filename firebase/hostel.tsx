@@ -66,6 +66,54 @@ const validateRoomData = (room: Partial<Room>) => {
   }
 };
 
+export const addRooms = async ({currentUser, libraryId, roomsData}: {currentUser: any, libraryId: string, roomsData:any})=> {
+    try {
+        if (!currentUser) {
+            throw new Error('User not authenticated. Redirecting to sign-in...');
+        }
+         
+        await addDoc(collection(db, 'rooms'), {
+            roomNumber: roomsData.roomNumber,
+            capacity: roomsData.capacity,
+            roomType: roomsData.roomType,
+            createdAt: serverTimestamp() as unknown as Date,
+            updatedAt: serverTimestamp() as unknown as Date,
+            admin: currentUser.uid,
+            libraryId: libraryId
+        });
+        return 'Room added successfully';
+        
+    } catch (error) {
+        console.error('Error adding room:', error);
+        throw new Error(`Failed to add room: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+export const getRooms = async ({currentUser, libraryId}: {currentUser: any, libraryId: string})=> {
+    try {
+        if (!currentUser) {
+            throw new Error('User not authenticated. Redirecting to sign-in...');
+        }
+        
+        const q = query(collection(db, 'rooms'), where('admin', '==', currentUser.uid), where('libraryId', '==', libraryId));
+        const roomsSnapshot = await getDocs(q);
+        
+        const rooms = roomsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            roomNumber: doc.data().roomNumber,
+            capacity: doc.data().capacity,
+            occupiedBeds: doc.data().occupiedBeds,
+            roomType: doc.data().roomType,
+            createdAt: doc.data().createdAt?.toDate() || new Date(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date()
+        }));
+        
+        return rooms;
+    } catch (error) {
+        console.error('Error getting rooms:', error);
+        throw new Error(`Failed to get rooms: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
 /**
  * Add a new room with validation and automatic timestamps
  */
@@ -310,16 +358,7 @@ interface PaginationResult {
   hasMore: boolean;
 }
 
-/**
- * Fetches members with pagination and filtering
- * @param {Object} params - Function parameters
- * @param {number} params.pageSize - Number of items per page
- * @param {QueryDocumentSnapshot<DocumentData> | undefined} params.lastVisible - Last document for pagination
- * @param {any} params.currentUser - Current authenticated user
- * @param {string} params.libraryId - Library ID for filtering
- * @param {Object} [params.filters] - Additional filters to apply
- * @returns {Promise<PaginationResult>} - Paginated result with members
- */
+
 export async function getMembers({
   pageSize,
   lastVisible,

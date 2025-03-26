@@ -1,679 +1,423 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TextInput, 
+  TouchableOpacity, 
+  Alert, 
   Modal,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  RefreshControl,
+  Pressable,
   ScrollView,
-  Platform
+  ActivityIndicator
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { addRoom, fetchRoomsByType, Room, RoomUpdate, assignStudentToRoom, removeStudentFromRoom } from '../../firebase/hostel';
-import { StudentPicker } from '@/component/room/StudentPicker';
-// import { Student } from '../../types/Student';
-import { DocumentData, QueryDocumentSnapshot } from '@firebase/firestore';
+import { addRooms, getRooms } from '@/firebase/hostel';
+import useStore from '@/hooks/store';
+import { AntDesign, MaterialIcons } from '@expo/vector-icons';
 
-type RoomType = 'AC' | 'Non-AC' | 'Dormitory';
+interface Room {
+  id: string;
+  roomNumber: string;
+  capacity: string;
+  roomType: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export default function RoomManagementScreen() {
+const RoomsScreen = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [selectedType, setSelectedType] = useState<RoomType>('AC');
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isStudentModalVisible, setIsStudentModalVisible] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-
-  // New room form state
-  const [newRoom, setNewRoom] = useState<Omit<Room, 'id' | 'createdAt' | 'updatedAt'>>({
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [formData, setFormData] = useState({
     roomNumber: '',
-    capacity: 2,
-    occupiedBeds: 0,
-    roomType: 'AC',
-    students: []
+    capacity: '',
+    roomType: '',
   });
 
-  // Load rooms with pagination
-const loadRooms = useCallback(async (type: RoomType, loadMore = false) => {
-  try {
-    if (!loadMore) {
-      setIsLoading(true);
-      setRooms([]);
-      setLastVisible(null);
-      setHasMore(true);
-    }
+  const currentUser = useStore((state: any) => state.currentUser);
+  const activeLibrary = useStore((state: any) => state.activeLibrary);
 
-    const { rooms: fetchedRooms, lastVisible: newLastVisible } = await fetchRoomsByType(type);
-    console.log(fetchedRooms);
-    setRooms(prev => {
-      // Filter out duplicates when loading more
-      const newRooms = loadMore 
-        ? fetchedRooms.filter(newRoom => 
-            !prev.some(existingRoom => existingRoom.id === newRoom.id)
-          )
-        : fetchedRooms;
-      
-      return loadMore ? [...prev, ...newRooms] : newRooms;
-    });
-    
-    setLastVisible(newLastVisible);
-    setHasMore(fetchedRooms.length > 0);
-  } catch (error) {
-    console.error('Failed to load rooms:', error);
-    Alert.alert('Error', 'Failed to load rooms. Please try again.');
-  } finally {
-    setIsLoading(false);
-    setRefreshing(false);
-  }
-}, [lastVisible]);
-
-  // Handle refresh
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadRooms(selectedType);
-  }, [selectedType]);
-
-  // Handle load more
-  const handleLoadMore = useCallback(() => {
-    if (!isLoading && hasMore) {
-      loadRooms(selectedType, true);
-    }
-  }, [isLoading, hasMore, selectedType]);
-
-  // Initial load and when room type changes
   useEffect(() => {
-    loadRooms(selectedType);
-  }, [selectedType]);
+    fetchRooms();
+  }, [activeLibrary]);
 
-  // Add new room
-  const handleAddRoom = async () => {
+  const fetchRooms = async () => {
+    if (!currentUser || !activeLibrary) return;
+    
+    setLoading(true);
     try {
-      setIsLoading(true);
-      await addRoom(newRoom);
-      setIsModalVisible(false);
-      setNewRoom({
+      const roomsData = await getRooms({ currentUser, libraryId: activeLibrary.id });
+      setRooms(roomsData);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to fetch rooms');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSubmit = async () => {
+    if (!currentUser || !activeLibrary) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    if (!formData.roomNumber || !formData.capacity) {
+      Alert.alert('Error', 'Room number and capacity are required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await addRooms({ currentUser, libraryId: activeLibrary.id, roomsData: formData });
+      Alert.alert('Success', 'Room added successfully');
+      setFormData({
         roomNumber: '',
-        capacity: 2,
-        occupiedBeds: 0,
-        roomType: 'AC',
-        students: []
+        capacity: '',
+        roomType: '',
       });
-      loadRooms(newRoom.roomType);
+      setModalVisible(false);
+      fetchRooms();
     } catch (error) {
       Alert.alert('Error', error instanceof Error ? error.message : 'Failed to add room');
+      console.error(error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  // Handle student assignment
-  const handleAssignStudent = async (student: any) => {
-    if (!selectedRoom) return;
-    
-    try {
-      setIsLoading(true);
-      await assignStudentToRoom(selectedRoom.id!, student.id);
-      setIsStudentModalVisible(false);
-      loadRooms(selectedRoom.roomType);
-      Alert.alert('Success', `${student.name} assigned to room ${selectedRoom.roomNumber}`);
-    } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to assign student');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle student removal
-  const handleRemoveStudent = async (studentId: string) => {
-    if (!selectedRoom) return;
-    
-    try {
-      setIsLoading(true);
-      await removeStudentFromRoom(selectedRoom.id!, studentId);
-      loadRooms(selectedRoom.roomType);
-      Alert.alert('Success', 'Student removed from room');
-    } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to remove student');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Render room type selector
-  const renderTypeSelector = () => (
-    <View style={styles.typeSelector}>
-      {(['AC', 'Non-AC', 'Dormitory'] as RoomType[]).map(type => (
-        <TouchableOpacity
-          key={type}
-          style={[
-            styles.typeButton,
-            selectedType === type && styles.selectedTypeButton
-          ]}
-          onPress={() => setSelectedType(type)}
-        >
-          <Text style={[
-            styles.typeText,
-            selectedType === type && styles.selectedTypeText
-          ]}>
-            {type}
-          </Text>
-        </TouchableOpacity>
-      ))}
+  const renderRoomItem = ({ item }: { item: Room }) => (
+    <View style={styles.roomItem}>
+      <View style={styles.roomHeader}>
+        <Text style={styles.roomNumber}>Room #{item.roomNumber}</Text>
+        <View style={styles.roomTypeBadge}>
+          <Text style={styles.roomTypeText}>{item.roomType}</Text>
+        </View>
+      </View>
+      <View style={styles.roomDetails}>
+        <View style={styles.detailRow}>
+          <MaterialIcons name="people" size={16} color="#555" />
+          <Text style={styles.detailText}>Capacity: {item.capacity}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <AntDesign name="calendar" size={14} color="#555" />
+          <Text style={styles.detailText}>Added: {new Date(item.createdAt).toLocaleDateString()}</Text>
+        </View>
+      </View>
     </View>
   );
 
-  // Render room item
- const renderRoomItem = ({ item }: { item: Room }) => {
-  console.log('Rendering room:', item); // Add this for debugging
   return (
-    <View style={styles.roomCard}>
-      <View style={styles.roomHeader}>
-        <Text style={styles.roomNumber}>Room {item.roomNumber}</Text>
-        <View style={styles.roomStatus}>
-          <View style={[
-            styles.statusIndicator,
-            item.occupiedBeds >= item.capacity ? styles.statusFull : styles.statusAvailable
-          ]} />
-          <Text style={styles.statusText}>
-            {item.occupiedBeds}/{item.capacity} beds
-          </Text>
-        </View>
-      </View>
-      
-      <View style={styles.roomDetails}>
-        <Text style={styles.roomType}>{item.roomType} Room</Text>
-        
-        {item.students && item.students.length > 0 ? (
-          <View style={styles.studentsContainer}>
-            <Text style={styles.studentsTitle}>Students:</Text>
-            {item.students.map(studentId => (
-              <View key={studentId} style={styles.studentItem}>
-                <Text style={styles.studentText}>{studentId}</Text>
-                <TouchableOpacity 
-                  onPress={() => handleRemoveStudent(studentId)}
-                  style={styles.removeButton}
-                >
-                  <MaterialIcons name="person-remove" size={18} color="#e74c3c" />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.noStudentsText}>No students assigned</Text>
-        )}
-      </View>
-      
-      <View style={styles.roomActions}>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Room Management</Text>
         <TouchableOpacity 
-          style={[
-            styles.actionButton,
-            item.occupiedBeds >= item.capacity && styles.disabledButton
-          ]}
-          onPress={() => {
-            setSelectedRoom(item);
-            setIsStudentModalVisible(true);
-          }}
-          disabled={item.occupiedBeds >= item.capacity}
+          style={styles.addButton}
+          onPress={() => setModalVisible(true)}
         >
-          <MaterialIcons 
-            name="person-add" 
-            size={20} 
-            color={item.occupiedBeds >= item.capacity ? '#95a5a6' : '#2ecc71'} 
-          />
-          <Text style={[
-            styles.actionText,
-            { color: item.occupiedBeds >= item.capacity ? '#95a5a6' : '#2ecc71' }
-          ]}>
-            Add Student
-          </Text>
+          <AntDesign name="plus" size={20} color="white" />
         </TouchableOpacity>
       </View>
+
+      {/* Rooms List */}
+      {loading && rooms.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007bff" />
+        </View>
+      ) : rooms.length === 0 ? (
+        <View style={styles.emptyState}>
+          <MaterialIcons name="meeting-room" size={50} color="#ccc" />
+          <Text style={styles.emptyText}>No rooms added yet</Text>
+          <TouchableOpacity 
+            style={styles.emptyButton}
+            onPress={() => setModalVisible(true)}
+          >
+            <Text style={styles.emptyButtonText}>Add Your First Room</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={rooms}
+          renderItem={renderRoomItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          refreshing={loading}
+          onRefresh={fetchRooms}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Add Room Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => {
+          setModalVisible(!modalVisible);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add New Room</Text>
+              <Pressable
+                onPress={() => setModalVisible(false)}
+                style={styles.closeButton}
+              >
+                <AntDesign name="close" size={24} color="#666" />
+              </Pressable>
+            </View>
+            
+            <ScrollView contentContainerStyle={styles.modalContent}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Room Number</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="101"
+                  value={formData.roomNumber}
+                  onChangeText={(text) => handleInputChange('roomNumber', text)}
+                  keyboardType="numeric"
+                />
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Capacity</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="2"
+                  value={formData.capacity}
+                  onChangeText={(text) => handleInputChange('capacity', text)}
+                  keyboardType="numeric"
+                />
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Room Type</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Single, Double, etc."
+                  value={formData.roomType}
+                  onChangeText={(text) => handleInputChange('roomType', text)}
+                />
+              </View>
+            </ScrollView>
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.submitButton]}
+                onPress={handleSubmit}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Add Room</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
-  // Render empty state
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <MaterialIcons name="meeting-room" size={48} color="#bdc3c7" />
-      <Text style={styles.emptyTitle}>No Rooms Found</Text>
-      <Text style={styles.emptySubtitle}>Add a new room to get started</Text>
-    </View>
-  );
-
-  // Render footer for loading more
-  const renderFooter = () => {
-    if (!hasMore) return null;
-    return (
-      <View style={styles.footer}>
-        <ActivityIndicator size="small" color="#3498db" />
-      </View>
-    );
-  };
-
-  return (
-    <View style={styles.safeContainer}>
-    <View style={styles.container}>
-      <Text style={styles.header}>Hostel Room Management</Text>
-      
-      {renderTypeSelector()}
-      
-      <View style={styles.listContainer}>
-        {isLoading && rooms.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3498db" />
-          </View>
-        ) : (
-          <FlatList
-            data={rooms}
-            renderItem={renderRoomItem}
-            keyExtractor={(item) => item.id!}
-            contentContainerStyle={styles.listContainer}
-            ListEmptyComponent={renderEmptyState}
-            ListFooterComponent={renderFooter}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={['#3498db']}
-                tintColor="#3498db"
-              />
-            }
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.5}
-          />
-        )}
-      </View>
-      
-      {/* Add Room Floating Button */}
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setIsModalVisible(true)}
-      >
-        <MaterialIcons name="add" size={28} color="white" />
-      </TouchableOpacity>
-      
-      {/* Add Room Modal */}
-      <Modal
-        visible={isModalVisible}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add New Room</Text>
-            <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-              <MaterialIcons name="close" size={24} color="#7f8c8d" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            <Text style={styles.inputLabel}>Room Number</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., 101A"
-              value={newRoom.roomNumber}
-              onChangeText={(text) => setNewRoom({...newRoom, roomNumber: text})}
-            />
-            
-            <Text style={styles.inputLabel}>Capacity</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Number of beds"
-              keyboardType="numeric"
-              value={newRoom.capacity.toString()}
-              onChangeText={(text) => setNewRoom({...newRoom, capacity: parseInt(text) || 0})}
-            />
-            
-            <Text style={styles.inputLabel}>Room Type</Text>
-            <View style={styles.modalTypeSelector}>
-              {(['AC', 'Non-AC', 'Dormitory'] as RoomType[]).map(type => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.modalTypeButton,
-                    newRoom.roomType === type && styles.selectedModalTypeButton
-                  ]}
-                  onPress={() => setNewRoom({...newRoom, roomType: type})}
-                >
-                  <Text style={newRoom.roomType === type ? styles.selectedModalTypeText : styles.modalTypeText}>
-                    {type}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-          
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => setIsModalVisible(false)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleAddRoom}
-              disabled={isLoading || !newRoom.roomNumber || newRoom.capacity <= 0}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.submitButtonText}>Add Room</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Student Assignment Modal */}
-      <StudentPicker
-        visible={isStudentModalVisible}
-        onClose={() => setIsStudentModalVisible(false)}
-        onSelectStudent={handleAssignStudent}
-        excludedStudentIds={selectedRoom?.students || []}
-      />
-    </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  safeContainer: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-    paddingTop: Platform.OS === 'ios' ? 50 : 100,
-  },
-
   container: {
-    flex: 1,
+    padding: 20,
     backgroundColor: '#f8f9fa',
-    paddingTop: Platform.OS === 'ios' ? 50 : 100,
   },
   header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    textAlign: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  typeSelector: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 15,
-    paddingHorizontal: 20,
-  },
-  typeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    backgroundColor: '#e9ecef',
-    marginHorizontal: 5,
-  },
-  selectedTypeButton: {
-    backgroundColor: '#3498db',
-  },
-  typeText: {
-    color: '#495057',
-    fontWeight: '500',
-  },
-  selectedTypeText: {
-    color: 'white',
-  },
-  listContainer: {
-    paddingHorizontal: 15,
-    paddingBottom: 20,
-  },
-  roomCard: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  roomHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  roomNumber: {
-    fontSize: 18,
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#2c3e50',
+    color: '#333',
   },
-  roomStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 5,
-  },
-  statusAvailable: {
-    backgroundColor: '#2ecc71',
-  },
-  statusFull: {
-    backgroundColor: '#e74c3c',
-  },
-  statusText: {
-    fontSize: 14,
-    color: '#7f8c8d',
-  },
-  roomDetails: {
-    marginTop: 5,
-  },
-  roomType: {
-    fontSize: 14,
-    color: '#3498db',
-    fontWeight: '500',
-    marginBottom: 10,
-  },
-  studentsContainer: {
-    marginTop: 5,
-  },
-  studentsTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#495057',
-    marginBottom: 5,
-  },
-  studentItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-  },
-  studentText: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  removeButton: {
-    padding: 5,
-  },
-  roomActions: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-    paddingTop: 10,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 5,
-  },
-  actionText: {
-    marginLeft: 5,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  noStudentsText: {
-    fontSize: 12,
-    color: '#95a5a6',
-    fontStyle: 'italic',
-    marginTop: 5,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  
-  emptyContainer: {
-    flex: 1,
+  addButton: {
+    backgroundColor: '#007bff',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    color: '#6c757d',
-    marginTop: 15,
-    fontWeight: '500',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#adb5bd',
-    marginTop: 5,
+    elevation: 2,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  footer: {
-    paddingVertical: 20,
-  },
-  addButton: {
-    position: 'absolute',
-    right: 25,
-    bottom: 25,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#3498db',
+  emptyState: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  emptyButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  listContainer: {
+    paddingBottom: 20,
+  },
+  roomItem: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 5,
+    elevation: 2,
+  },
+  roomHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  roomNumber: {
+    fontWeight: 'bold',
+    fontSize: 18,
+    color: '#333',
+  },
+  roomTypeBadge: {
+    backgroundColor: '#e3f2fd',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  roomTypeText: {
+    color: '#1976d2',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  roomDetails: {
+    marginTop: 8,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  detailText: {
+    marginLeft: 8,
+    color: '#555',
+    fontSize: 14,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
-    flex: 1,
+    width: '90%',
+    maxHeight: '80%',
     backgroundColor: 'white',
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#eee',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2c3e50',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 4,
   },
   modalContent: {
-    padding: 20,
+    padding: 16,
+  },
+  inputContainer: {
+    marginBottom: 16,
   },
   inputLabel: {
+    marginBottom: 8,
     fontSize: 14,
-    color: '#495057',
-    marginBottom: 5,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#555',
   },
   input: {
+    height: 48,
     borderWidth: 1,
-    borderColor: '#ced4da',
-    borderRadius: 5,
-    padding: 12,
-    marginBottom: 15,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
     fontSize: 16,
-    backgroundColor: '#f8f9fa',
-  },
-  modalTypeSelector: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  modalTypeButton: {
-    flex: 1,
-    padding: 12,
-    marginHorizontal: 5,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ced4da',
-    alignItems: 'center',
-  },
-  selectedModalTypeButton: {
-    borderColor: '#3498db',
-    backgroundColor: '#e7f5ff',
-  },
-  modalTypeText: {
-    color: '#495057',
-  },
-  selectedModalTypeText: {
-    color: '#3498db',
-    fontWeight: '500',
+    backgroundColor: '#f9f9f9',
   },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: '#eee',
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cancelButton: {
-    flex: 1,
-    padding: 15,
-    marginRight: 10,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ced4da',
-    alignItems: 'center',
+    backgroundColor: '#f1f1f1',
+    marginRight: 8,
   },
   cancelButtonText: {
-    color: '#495057',
-    fontWeight: '500',
+    color: '#666',
+    fontWeight: '600',
   },
   submitButton: {
-    flex: 1,
-    padding: 15,
-    marginLeft: 10,
-    borderRadius: 5,
-    backgroundColor: '#3498db',
-    alignItems: 'center',
-    opacity: 1,
-  },
-  submitButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: '#007bff',
+    marginLeft: 8,
   },
   submitButtonText: {
     color: 'white',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
+
+export default RoomsScreen;
