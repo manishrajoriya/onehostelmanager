@@ -126,7 +126,7 @@ const AttendanceScreen: React.FC = () => {
         <Text style={styles.datePickerButtonText}>
           {formatDisplayDate(selectedDate)}
         </Text>
-        <MaterialIcons name="calendar-today" size={20} color="#6B46C1" />
+        <MaterialIcons name="calendar-today" size={20} color="#02c39a" />
       </TouchableOpacity>
 
       {showDatePicker && (
@@ -141,7 +141,7 @@ const AttendanceScreen: React.FC = () => {
       {/* Loading and Error States */}
       {loading ? (
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#6B46C1" />
+          <ActivityIndicator size="large" color="#02c39a" />
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#6B46C1",
+    color: "#02c39a",
   },
   headerSubtitle: {
     fontSize: 14,
@@ -199,11 +199,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#6B46C1",
+    borderColor: "#02c39a",
   },
   datePickerButtonText: {
     fontSize: 16,
-    color: "#6B46C1",
+    color: "#02c39a",
     fontWeight: "500",
   },
   loader: {
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   retryButton: {
-    backgroundColor: "#6B46C1",
+    backgroundColor: "#02c39a",
     padding: 10,
     borderRadius: 8,
   },
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 12,
-    color: "#6B46C1",
+    color: "#02c39a",
   },
   memberContainer: {
     flexDirection: "row",
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   present: {
-    color: "#4CAF50",
+    color: "#02c39a",
   },
   absent: {
     color: "#F44336",

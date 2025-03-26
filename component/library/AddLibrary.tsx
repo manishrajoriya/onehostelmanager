@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   submitButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#02c39a',
   },
   buttonText: {
     color: 'white',

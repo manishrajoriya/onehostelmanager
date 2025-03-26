@@ -78,7 +78,7 @@ export default function MemberPaymentList() {
 
   const renderFooter = () => {
     if (!hasMore) return <Text style={styles.endMessage}>No more members to load</Text>;
-    if (loading && members.length > 0) return <ActivityIndicator size="large" color="#6B46C1" />;
+    if (loading && members.length > 0) return <ActivityIndicator size="large" color="#02c39a" />;
     return null;
   };
 
@@ -118,7 +118,7 @@ export default function MemberPaymentList() {
   if (loading && members.length === 0) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#6B46C1" />
+        <ActivityIndicator size="large" color="#02c39a" />
       </View>
     );
   }
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   downloadButton: {
-    backgroundColor: "#6B46C1",
+    backgroundColor: "#02c39a",
     padding: 8,
     borderRadius: 8,
   },
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     padding: 16,
-    backgroundColor: "#6B46C1",
+    backgroundColor: "#02c39a",
     borderRadius: 8,
     marginBottom: 8,
   },
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: "#6B46C1",
+    backgroundColor: "#02c39a",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 4,

@@ -230,7 +230,7 @@ const AttendancePage: React.FC = () => {
 
       {/* Member List */}
       {isLoading ? (
-        <ActivityIndicator size="large" color="#6B46C1" />
+        <ActivityIndicator size="large" color="#02c39a" />
       ) : (
         <FlatList
           data={filteredMembers}
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   datePickerButton: {
-    backgroundColor: "#6B46C1",
+    backgroundColor: "#02c39a",
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#e0e0e0",
   },
   activeFilter: {
-    backgroundColor: "#6B46C1",
+    backgroundColor: "#02c39a",
   },
   filterText: {
     fontSize: 14,
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#e0e0e0",
   },
   activeButton: {
-    backgroundColor: "#6B46C1",
+    backgroundColor: "#02c39a",
   },
   attendanceButtonText: {
     color: "#333",
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   saveButton: {
-    backgroundColor: "#6B46C1",
+    backgroundColor: "#02c39a",
     padding: 16,
     borderRadius: 8,
     alignItems: "center",

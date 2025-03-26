@@ -339,14 +339,14 @@ const styles = StyleSheet.create({
   },
   active: {
     backgroundColor: "#e0f7fa",
-    borderColor: "#00796b",
+    borderColor: "#02c39a",
   },
   toggleText: {
     fontSize: 16,
     color: "#333",
   },
   addButton: {
-    backgroundColor: "#34A853",
+    backgroundColor: "#02c39a",
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   earning: {
-    color: "#34A853",
+    color: "#02c39a",
   },
   expense: {
     color: "#EA4335",
