@@ -86,13 +86,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.manishrajoriya0.mobilelibrary'
+    namespace 'com.manishrajoriya0.onehostel'
     defaultConfig {
-        applicationId 'com.manishrajoriya0.mobilelibrary'
+        applicationId 'com.manishrajoriya0.onehostel'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.0.6"
     }
     signingConfigs {
         debug {

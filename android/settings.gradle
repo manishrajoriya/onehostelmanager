@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'One Library'
+rootProject.name = 'One Hostel'
 
 dependencyResolutionManagement {
   versionCatalogs {
