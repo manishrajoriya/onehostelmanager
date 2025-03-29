@@ -173,10 +173,10 @@ export default function AddMemberForm() {
         {/* Plan Selection */}
         <Controller
           control={control}
-          rules={{ required: "Shift is required" }}
+          rules={{ required: "Plan is required" }}
           render={({ field: { onChange, value }, fieldState: { error } }) => (
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Shift</Text>
+              <Text style={styles.label}>Plan</Text>
               <View style={[styles.pickerContainer, error && styles.inputError]}>
                 <Picker
                   selectedValue={value}
@@ -186,7 +186,7 @@ export default function AddMemberForm() {
                   }}
                   style={styles.picker}
                 >
-                  <Picker.Item label="Select Shift" value="" />
+                  <Picker.Item label="Select Plan" value="" />
                   {plans.map((plan) => (
                     <Picker.Item key={plan.id} label={plan.name} value={plan.name} />
                   ))}

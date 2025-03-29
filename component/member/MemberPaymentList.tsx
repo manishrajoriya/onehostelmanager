@@ -9,6 +9,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
 import { formatDate } from "./AddMemberForm";
+import {totalAmountCount, paidAmountCount, dueAmountCount} from "@/firebase/functions";
 
 interface Member {
   id: string;
@@ -31,9 +32,29 @@ export default function MemberPaymentList() {
   const currentUser = useStore((state: any) => state.currentUser);
   const activeLibrary = useStore((state: any) => state.activeLibrary);
 
+  // Calculate totals
+  const [totalPaid, setTotalPaid] = useState<number>(0);
+  const [totalDue, setTotalDue] = useState<number>(0);
+  const [totalAmount, setTotalAmount] = useState<number>(0);
+
+
+ 
+
+
   useEffect(() => {
     fetchMembers();
+    fetchAmount();
   }, []);
+
+  const fetchAmount = async () => {
+    const totalPaid = await paidAmountCount({ currentUser, libraryId: activeLibrary?.id || "" });
+    const totalDue = await dueAmountCount({ currentUser, libraryId: activeLibrary?.id || "" });
+    const totalAmount = await totalAmountCount({ currentUser, libraryId: activeLibrary?.id || "" });
+
+    setTotalPaid(totalPaid);
+    setTotalDue(totalDue);
+    setTotalAmount(totalAmount);
+  };
 
   const fetchMembers = async (loadMore = false) => {
     if (!loadMore) setLoading(true);
@@ -59,11 +80,19 @@ export default function MemberPaymentList() {
   };
 
   const renderHeader = () => (
+    <View>
     <View style={styles.tableHeader}>
       <Text style={styles.headerText}>Full Name</Text>
       <Text style={styles.headerText}>Paid Amount</Text>
       <Text style={styles.headerText}>Due Amount</Text>
       <Text style={styles.headerText}>Total Amount</Text>
+    </View>
+    <View style={[styles.tableRow, styles.totalRow]}>
+      <Text style={[styles.cellText, styles.totalText]}>Total</Text>
+      <Text style={[styles.cellText, styles.totalText]}>{totalPaid}</Text>
+      <Text style={[styles.cellText, styles.totalText, styles.dueAmount]}>{totalDue}</Text>
+      <Text style={[styles.cellText, styles.totalText]}>{totalAmount}</Text>
+    </View>
     </View>
   );
 
@@ -76,23 +105,25 @@ export default function MemberPaymentList() {
     </View>
   );
 
-  const renderFooter = () => {
-    if (!hasMore) return <Text style={styles.endMessage}>No more members to load</Text>;
-    if (loading && members.length > 0) return <ActivityIndicator size="large" color="#02c39a" />;
-    return null;
-  };
-
   const generateExcel = async () => {
     try {
-      const ws = XLSX.utils.json_to_sheet(
-        members.map((member) => ({
+      // Add totals row to the Excel data
+      const excelData = [
+        ...members.map((member) => ({
           "Full Name": member.fullName,
           "Paid Amount": member.paidAmount,
           "Due Amount": member.dueAmount,
           "Total Amount": member.totalAmount,
         })),
-      );
+        {
+          "Full Name": "TOTAL",
+          "Paid Amount": totalPaid,
+          "Due Amount": totalDue,
+          "Total Amount": totalAmount,
+        },
+      ];
 
+      const ws = XLSX.utils.json_to_sheet(excelData);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Members");
 
@@ -142,6 +173,7 @@ export default function MemberPaymentList() {
           <Ionicons name="download-outline" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
+      
       <FlatList
         data={members}
         renderItem={renderMemberItem}
@@ -149,7 +181,6 @@ export default function MemberPaymentList() {
         ListHeaderComponent={renderHeader}
         onEndReached={() => hasMore && fetchMembers(true)}
         onEndReachedThreshold={0.1}
-        ListFooterComponent={renderFooter}
       />
     </View>
   );
@@ -205,11 +236,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  totalRow: {
+    backgroundColor: "#e6f7f4",
+    borderTopWidth: 2,
+    borderTopColor: "#02c39a",
+  },
   cellText: {
     fontSize: 14,
     color: "#333",
     flex: 1,
     textAlign: "center",
+  },
+  totalText: {
+    fontWeight: "bold",
+    fontSize: 15,
   },
   dueAmount: {
     color: "#e53e3e",

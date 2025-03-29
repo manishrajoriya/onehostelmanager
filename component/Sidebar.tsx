@@ -72,13 +72,13 @@ const CustomDrawerContent = (props: any) => {
           isActive={activeRoute === "Home"}
         />
         <DrawerItem
-          label="Add Library"
+          label="Add Hostel"
           icon="library-outline"
           onPress={() => props.navigation.navigate("AddLibrary")}
           isActive={activeRoute === "AddLibrary"}
         />
         <DrawerItem
-          label="Add Seats"
+          label="Add Room"
           icon="add-outline"
           onPress={() => props.navigation.navigate("AddSeats")}
           isActive={activeRoute === "AddSeats"}
@@ -95,7 +95,7 @@ const CustomDrawerContent = (props: any) => {
           isActive={activeRoute === "AddMember"}
         />
         <DrawerItem
-          label="Allot Seat"
+          label="Allot Room"
           icon="person-add-outline"
           onPress={() => props.navigation.navigate("AllotSeat")}
           isActive={activeRoute === "AllotSeat"}
@@ -115,15 +115,15 @@ const CustomDrawerContent = (props: any) => {
         {/* Line Separator */}
         <View style={styles.separator} />
         {/* Shifts Section */}
-        <Text style={styles.sectionTitle}>Shifts</Text>
+        <Text style={styles.sectionTitle}>Room Plan</Text>
         <DrawerItem
-          label="Add Shift"
+          label="Add Plan"
           icon="calendar-outline"
           onPress={() => props.navigation.navigate("ShiftForm")}
           isActive={activeRoute === "ShiftForm"}
         />
         <DrawerItem
-          label="Shift Details"
+          label="Plan Details"
           icon="document-text-outline"
           onPress={() => props.navigation.navigate("ShiftDetails")}
           isActive={activeRoute === "ShiftDetails"}
@@ -229,20 +229,20 @@ const Sidebar = () => {
       }}
     >
       <Drawer.Screen name="Home" component={MembersDashboard} />
-      <Drawer.Screen name="AddLibrary" component={AddLibraryScreen} />
-      <Drawer.Screen name="AddSeats" component={AddSeatsPage} />
-      <Drawer.Screen name="AddMember" component={AddMemberForm} />
-      <Drawer.Screen name="AllotSeat" component={AllocateSeatsPage} />
-      <Drawer.Screen name="Profile" component={MemberProfileCard} />
-      <Drawer.Screen name="MemberPayment" component={MemberPaymentList} />
-      <Drawer.Screen name="ShiftForm" component={ShiftForm} />
-      <Drawer.Screen name="ShiftDetails" component={ShiftDetails} />
-      <Drawer.Screen name="Finance" component={Finance} />
+      <Drawer.Screen name="AddLibrary" component={AddLibraryScreen} options={{ title: "Add Hostel" }}/>
+      <Drawer.Screen name="AddSeats" component={AddSeatsPage}  options={{ title: "Add Room" }}/>
+      <Drawer.Screen name="AddMember" component={AddMemberForm} options={{ title: "Add Member" }}/>
+      <Drawer.Screen name="AllotSeat" component={AllocateSeatsPage} options={{ title: "Allot Room" }}/>
+      <Drawer.Screen name="Profile" component={MemberProfileCard} options={{ title: "Profile" }}/>
+      <Drawer.Screen name="MemberPayment" component={MemberPaymentList} options={{ title: "Member Payment" }}/>
+      <Drawer.Screen name="ShiftForm" component={ShiftForm} options={{ title: "Add Plan" }}/>
+      <Drawer.Screen name="ShiftDetails" component={ShiftDetails} options={{ title: "Plan Details" }}/>
+      <Drawer.Screen name="Finance" component={Finance} options={{ title: "Finance" }}/>
       {/* Removed Pricing Screen */}
-      <Drawer.Screen name="Attendance" component={AttendancePage} />
-      <Drawer.Screen name="AttendanceReport" component={AttendanceReport} />
-      <Drawer.Screen name="DownloadMembers" component={DownloadMembersPage} />
-      <Drawer.Screen name="Logout" component={LogoutScreen} />
+      <Drawer.Screen name="Attendance" component={AttendancePage} options={{ title: "Attendance" }}/>
+      <Drawer.Screen name="AttendanceReport" component={AttendanceReport} options={{ title: "Attendance Report" }}/>
+      <Drawer.Screen name="DownloadMembers" component={DownloadMembersPage} options={{ title: "Download Members" }}/>
+      <Drawer.Screen name="Logout" component={LogoutScreen} options={{ title: "Logout" }}/>
     </Drawer.Navigator>
   )
 }

@@ -209,7 +209,7 @@ const AddLibraryScreen = () => {
             }}
           >
             <Ionicons name="add-circle" size={24} color="white" />
-            <Text style={styles.addButtonText}>Add New Library</Text>
+            <Text style={styles.addButtonText}>Add New Hostel</Text>
           </TouchableOpacity>
         }
         renderItem={({ item }) => (

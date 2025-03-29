@@ -27,7 +27,7 @@ const StatCard = ({
 }: {
   icon: any
   title: string
-  value: number
+  value: string
   color: string
   style: any
   onPress: () => void
@@ -95,8 +95,8 @@ export default function MembersDashboard() {
   const stats = [
     {
       icon: "people",
-      title: "Total Members",
-      value: member,
+      title: "Members",
+      value: member.toString(),
       color: "#4285F4",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberProfileCard"),
@@ -104,7 +104,7 @@ export default function MembersDashboard() {
     {
       icon: "people",
       title: "Live Members",
-      value: liveMember,
+      value: liveMember.toString(),
       color: "#34A853",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberProfileCard"),
@@ -112,7 +112,7 @@ export default function MembersDashboard() {
     {
       icon: "person-remove",
       title: "Inactive Members",
-      value: inactiveMember,
+      value: inactiveMember.toString(),
       color: "#EA4335",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberProfileCard"),
@@ -120,43 +120,43 @@ export default function MembersDashboard() {
     {
       icon: "card",
       title: "Total Amount",
-      value: totalAmount,
+      value: totalAmount.toString(),
       color: "#4285F4",
       style: { backgroundColor: "#fff" },
-      onPress: () => router.push("/memberProfileCard"),
+      onPress: () => router.push("/memberPaymemt"),
     },
     {
       icon: "cash",
       title: "Paid Amount",
-      value: paidAmount,
+      value: paidAmount.toString(),
       color: "#9C27B0",
       style: { backgroundColor: "#fff" },
-      onPress: () => router.push("/memberProfileCard"),
+      onPress: () => router.push("/memberPaymemt"),
     },
     {
       icon: "time",
       title: "Due Amount",
-      value: dueAmount,
+      value: dueAmount.toString(),
       color: "#FB8C00",
       style: { backgroundColor: "#fff" },
-      onPress: () => router.push("/memberProfileCard"),
+      onPress: () => router.push("/memberPaymemt"),
     },
     {
       icon: "trending-up",
       title: "Finance",
-      value: 1,
+      value: "",
       color: "#34A853",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/finance"),
     },
-    {
-      icon: "stats-chart",
-      title: "Payment",
-      value: totalAmount,
-      color: "#EA4335",
+     {
+      icon: "people",
+      title: "Allot Room",
+      value: "",
+      color: "#02c39a",
       style: { backgroundColor: "#fff" },
-      onPress: () => router.push("/memberPaymemt"),
-    },
+      onPress: () => router.push("/allotseats"),
+    }
   ]
 
   return (
@@ -169,7 +169,7 @@ export default function MembersDashboard() {
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
             <TouchableOpacity onPress={() => router.push("/addLibrary")}>
-              <Ionicons name="add" size={24} color="#34A853" />
+              <Ionicons name="chevron-down" size={24} color="#34A853" />
             </TouchableOpacity>
           </View>
           <Text style={styles.profileName}>{activeLibrary ? activeLibrary.name : "First add hostel"}</Text>

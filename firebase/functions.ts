@@ -681,34 +681,51 @@ export const getAttendanceById = async (id: string) => {
   }
 }
 
-export const addSeats = async ({ currentUser, numberOfSeats, libraryId }: { currentUser: any, numberOfSeats: number, libraryId: string }) => {
+export const addSeats = async ({ currentUser, numberOfSeats, libraryId, roomType, roomNumber }: {
+  currentUser: any;
+  numberOfSeats: number;
+  libraryId: string;
+  roomType: 'AC' | 'Non-AC' | 'Dormitory';
+  roomNumber: string;
+}) => {
   try {
-    // const currentUser = getAuth().currentUser
     if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...")
+      throw new Error("User not authenticated. Redirecting to sign-in...");
     }
-    const q = query(collection(db, "seats"), where("admin", "==", currentUser.uid), where("libraryId", "==", libraryId))
-    const seatSnapshot = await getDocs(q)
-    const currentSeatCount = seatSnapshot.size
 
+    // Query to find existing seats in the same room
+    const q = query(
+      collection(db, "seats"),
+      where("admin", "==", currentUser.uid),
+      where("libraryId", "==", libraryId),
+      where("roomType", "==", roomType),
+      where("roomNumber", "==", roomNumber)
+    );
+
+    const seatSnapshot = await getDocs(q);
+    const currentSeatCount = seatSnapshot.size;
+
+    // Add new seats to the room
     for (let i = 0; i < numberOfSeats; i++) {
       await addDoc(collection(db, "seats"), {
-        seatId: `Room-${currentSeatCount + i + 1}`,
+        seatId: `${roomNumber}-bed-${currentSeatCount + i + 1}`,
         isAllocated: false,
         allocatedTo: null,
-        memberName: null,  
+        memberName: null,
         memberExpiryDate: null,
         admin: currentUser.uid,
-        libraryId: libraryId
+        libraryId: libraryId,
+        roomType: roomType,
+        roomNumber: roomNumber,
       });
     }
-  
-    return `Added ${numberOfSeats} seats`;
+
+    return `Added ${numberOfSeats} beds to ${roomType} room ${roomNumber}`;
   } catch (error) {
-    console.error("Error adding seats:", error);
+    console.error("Error adding beds:", error);
     throw error;
   }
-}
+};
 
 export const deleteSeat = async (seatId: string) => {
   try {
@@ -765,7 +782,9 @@ export const fetchSeats = async ({currentUser, libraryId }: { currentUser: any, 
       isAllocated: doc.data().isAllocated,
       allocatedTo: doc.data().allocatedTo,
       memberName: doc.data().memberName,
-      memberExpiryDate: doc.data().memberExpiryDate
+      memberExpiryDate: doc.data().memberExpiryDate,
+      roomType: doc.data().roomType,
+      roomNumber: doc.data().roomNumber
     }));
     return seats;
   } catch (error) {
