@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react"
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Modal, TextInput } from "react-native"
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Modal, TextInput, RefreshControl, Alert } from "react-native"
 import { getPlans, updatePlan, deletePlan } from "@/firebase/functions"
 import useStore from "@/hooks/store"
+import { MaterialIcons } from '@expo/vector-icons'
 
 type PlanDetailsProps = {
   id: string
@@ -12,12 +13,21 @@ type PlanDetailsProps = {
   createdAt?: string
 }
 
+interface FormErrors {
+  name?: string;
+  duration?: string;
+  amount?: string;
+}
+
 export default function AllPlans() {
   const [plans, setPlans] = useState<PlanDetailsProps[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingPlan, setEditingPlan] = useState<PlanDetailsProps | null>(null)
   const [isModalVisible, setIsModalVisible] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const currentUser = useStore((state: any) => state.currentUser);
   const activeLibrary = useStore((state: any) => state.activeLibrary);
@@ -28,55 +38,112 @@ export default function AllPlans() {
 
   const fetchPlans = async () => {
     try {
+      setLoading(true)
+      setError(null)
       const plansData = await getPlans({libraryId: activeLibrary.id, currentUser})
       setPlans(plansData)
-      setLoading(false)
-    } catch (err) {
-      setError("Failed to fetch plans. Please try again later.")
+    } catch (err: any) {
+      console.error('Error fetching plans:', err)
+      setError(err.message || "Failed to fetch plans. Please try again later.")
+    } finally {
       setLoading(false)
     }
   }
 
-  if (plans.length === 0 && !loading) {
-  return (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyText}>No plans available. Add your first plan!</Text>
-    </View>
-  );
-}
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await fetchPlans()
+    setRefreshing(false)
+  }
 
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {}
+    let isValid = true
+
+    if (!editingPlan?.name?.trim()) {
+      newErrors.name = 'Plan name is required'
+      isValid = false
+    }
+
+    if (!editingPlan?.duration?.trim()) {
+      newErrors.duration = 'Duration is required'
+      isValid = false
+    } else if (isNaN(Number(editingPlan.duration)) || Number(editingPlan.duration) <= 0) {
+      newErrors.duration = 'Duration must be a positive number'
+      isValid = false
+    }
+
+    if (!editingPlan?.amount?.trim()) {
+      newErrors.amount = 'Amount is required'
+      isValid = false
+    } else if (isNaN(Number(editingPlan.amount)) || Number(editingPlan.amount) <= 0) {
+      newErrors.amount = 'Amount must be a positive number'
+      isValid = false
+    }
+
+    setFormErrors(newErrors)
+    return isValid
+  }
 
   const handleEdit = (plan: PlanDetailsProps) => {
     setEditingPlan(plan)
+    setFormErrors({})
     setIsModalVisible(true)
   }
 
   const handleDelete = async (id: string) => {
-    try {
-      await deletePlan({ id, })
-      setPlans(plans.filter((plan) => plan.id !== id))
-    } catch (err) {
-      setError("Failed to delete plan. Please try again.")
-    }
+    Alert.alert(
+      "Delete Plan",
+      "Are you sure you want to delete this plan? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deletePlan({ id })
+              setPlans(plans.filter((plan) => plan.id !== id))
+            } catch (err: any) {
+              console.error('Error deleting plan:', err)
+              setError(err.message || "Failed to delete plan. Please try again.")
+            }
+          }
+        }
+      ]
+    )
   }
 
   const handleUpdate = async () => {
-    if (editingPlan) {
-      try {
-        await updatePlan({ id: editingPlan.id, data: editingPlan, currentUser,  })
-        setPlans(plans.map((plan) => (plan.id === editingPlan.id ? editingPlan : plan)))
-        setIsModalVisible(false)
-        setEditingPlan(null)
-      } catch (err) {
-        setError("Failed to update plan. Please try again.")
-      }
+    if (!editingPlan) return
+
+    if (!validateForm()) {
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      await updatePlan({ id: editingPlan.id, data: editingPlan, currentUser })
+      setPlans(plans.map((plan) => (plan.id === editingPlan.id ? editingPlan : plan)))
+      setIsModalVisible(false)
+      setEditingPlan(null)
+      setFormErrors({})
+    } catch (err: any) {
+      console.error('Error updating plan:', err)
+      setError(err.message || "Failed to update plan. Please try again.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
+        <ActivityIndicator size="large" color="#02c39a" />
+        <Text style={styles.loadingText}>Loading plans...</Text>
       </View>
     )
   }
@@ -84,30 +151,75 @@ export default function AllPlans() {
   if (error) {
     return (
       <View style={styles.centerContainer}>
+        <MaterialIcons name="error-outline" size={48} color="#ef4444" />
         <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchPlans}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
+  if (plans.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <MaterialIcons name="assignment" size={48} color="#94a3b8" />
+        <Text style={styles.emptyText}>No plans available</Text>
+        <Text style={styles.emptySubtext}>Add your first plan to get started</Text>
       </View>
     )
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       {plans.map((plan) => (
         <View key={plan.id} style={styles.card}>
-          <View style={styles.header}>
-            <Text style={styles.title}>{plan.name}</Text>
-            {plan.createdAt && <Text style={styles.date}>{new Date(plan.createdAt).toLocaleDateString()}</Text>}
+          <View style={styles.cardHeader}>
+            <View style={styles.titleContainer}>
+              <Text style={styles.title}>{plan.name}</Text>
+              {plan.createdAt && (
+                <Text style={styles.date}>
+                  Created: {new Date(plan.createdAt).toLocaleDateString()}
+                </Text>
+              )}
+            </View>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity 
+                style={[styles.iconButton, styles.editButton]} 
+                onPress={() => handleEdit(plan)}
+              >
+                <MaterialIcons name="edit" size={20} color="#ffffff" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.iconButton, styles.deleteButton]} 
+                onPress={() => handleDelete(plan.id)}
+              >
+                <MaterialIcons name="delete" size={20} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.detailsContainer}>
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Duration</Text>
+              <View style={styles.detailLabel}>
+                <MaterialIcons name="schedule" size={20} color="#64748b" />
+                <Text style={styles.label}>Duration</Text>
+              </View>
               <View style={styles.valueContainer}>
                 <Text style={styles.value}>{plan.duration} Days</Text>
               </View>
             </View>
 
             <View style={styles.detailRow}>
-              <Text style={styles.label}>Amount</Text>
+              <View style={styles.detailLabel}>
+                <MaterialIcons name="payments" size={20} color="#64748b" />
+                <Text style={styles.label}>Amount</Text>
+              </View>
               <View style={styles.valueContainer}>
                 <Text style={styles.value}>₹{plan.amount}</Text>
               </View>
@@ -115,19 +227,13 @@ export default function AllPlans() {
 
             {plan.description && (
               <View style={styles.descriptionContainer}>
-                <Text style={styles.label}>Description</Text>
+                <View style={styles.detailLabel}>
+                  <MaterialIcons name="description" size={20} color="#64748b" />
+                  <Text style={styles.label}>Description</Text>
+                </View>
                 <Text style={styles.description}>{plan.description}</Text>
               </View>
             )}
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.editButton} onPress={() => handleEdit(plan)}>
-              <Text style={styles.buttonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(plan.id)}>
-              <Text style={styles.buttonText}>Delete</Text>
-            </TouchableOpacity>
           </View>
         </View>
       ))}
@@ -135,43 +241,105 @@ export default function AllPlans() {
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Plan</Text>
-            <TextInput
-              style={styles.input}
-              value={editingPlan?.name}
-              onChangeText={(text) => setEditingPlan((prev) => (prev ? { ...prev, name: text } : null))}
-              placeholder="Plan Name"
-            />
-            <TextInput
-              style={styles.input}
-              value={editingPlan?.description}
-              onChangeText={(text) => setEditingPlan((prev) => (prev ? { ...prev, description: text } : null))}
-              placeholder="Description"
-              multiline
-            />
-            <TextInput
-              style={styles.input}
-              value={editingPlan?.duration}
-              onChangeText={(text) => setEditingPlan((prev) => (prev ? { ...prev, duration: text } : null))}
-              placeholder="Duration (days)"
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={styles.input}
-              value={editingPlan?.amount}
-              onChangeText={(text) => setEditingPlan((prev) => (prev ? { ...prev, amount: text } : null))}
-              placeholder="Amount"
-              keyboardType="numeric"
-            />
-            <View style={styles.modalButtonContainer}>
-              <TouchableOpacity style={styles.modalButton} onPress={handleUpdate}>
-                <Text style={styles.buttonText}>Update</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Plan</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => {
+                  setIsModalVisible(false)
+                  setEditingPlan(null)
+                  setFormErrors({})
+                }}
+              >
+                <MaterialIcons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setIsModalVisible(false)}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Plan Name</Text>
+              <TextInput
+                style={[styles.input, formErrors.name && styles.inputError]}
+                value={editingPlan?.name}
+                onChangeText={(text) => {
+                  setEditingPlan((prev) => (prev ? { ...prev, name: text } : null))
+                  if (formErrors.name) {
+                    setFormErrors({ ...formErrors, name: undefined })
+                  }
+                }}
+                placeholder="Enter plan name"
+                placeholderTextColor="#94a3b8"
+              />
+              {formErrors.name && <Text style={styles.errorText}>{formErrors.name}</Text>}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Description</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={editingPlan?.description}
+                onChangeText={(text) => setEditingPlan((prev) => (prev ? { ...prev, description: text } : null))}
+                placeholder="Enter description"
+                placeholderTextColor="#94a3b8"
+                multiline
+                numberOfLines={4}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Duration (days)</Text>
+              <TextInput
+                style={[styles.input, formErrors.duration && styles.inputError]}
+                value={editingPlan?.duration}
+                onChangeText={(text) => {
+                  setEditingPlan((prev) => (prev ? { ...prev, duration: text } : null))
+                  if (formErrors.duration) {
+                    setFormErrors({ ...formErrors, duration: undefined })
+                  }
+                }}
+                placeholder="Enter duration"
+                placeholderTextColor="#94a3b8"
+                keyboardType="numeric"
+              />
+              {formErrors.duration && <Text style={styles.errorText}>{formErrors.duration}</Text>}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Amount</Text>
+              <TextInput
+                style={[styles.input, formErrors.amount && styles.inputError]}
+                value={editingPlan?.amount}
+                onChangeText={(text) => {
+                  setEditingPlan((prev) => (prev ? { ...prev, amount: text } : null))
+                  if (formErrors.amount) {
+                    setFormErrors({ ...formErrors, amount: undefined })
+                  }
+                }}
+                placeholder="Enter amount"
+                placeholderTextColor="#94a3b8"
+                keyboardType="numeric"
+              />
+              {formErrors.amount && <Text style={styles.errorText}>{formErrors.amount}</Text>}
+            </View>
+
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setIsModalVisible(false)
+                  setEditingPlan(null)
+                  setFormErrors({})
+                }}
               >
                 <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.updateButton, isSubmitting && styles.submitButtonDisabled]} 
+                onPress={handleUpdate}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.buttonText}>
+                  {isSubmitting ? 'Updating...' : 'Update'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -184,48 +352,98 @@ export default function AllPlans() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#f8fafc",
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f5f5f5",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#64748b",
   },
   errorText: {
     color: "#ef4444",
     fontSize: 16,
     textAlign: "center",
-    fontWeight: "500",
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: "#02c39a",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  emptyText: {
+    fontSize: 18,
+    color: "#1e293b",
+    fontWeight: "600",
+    marginTop: 12,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: "#64748b",
+    marginTop: 4,
   },
   card: {
     backgroundColor: "#ffffff",
-    borderRadius: 12,
+    borderRadius: 16,
     margin: 16,
-    padding: 16,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  header: {
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  titleContainer: {
+    flex: 1,
+    marginRight: 12,
   },
   title: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#1f2937",
+    color: "#1e293b",
+    marginBottom: 4,
   },
   date: {
-    fontSize: 14,
-    color: "#6b7280",
+    fontSize: 12,
+    color: "#64748b",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editButton: {
+    backgroundColor: "#3b82f6",
+  },
+  deleteButton: {
+    backgroundColor: "#ef4444",
   },
   detailsContainer: {
-    marginTop: 8,
+    gap: 12,
   },
   detailRow: {
     flexDirection: "row",
@@ -233,54 +451,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#e2e8f0",
+  },
+  detailLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   label: {
-    fontSize: 16,
-    color: "#4b5563",
+    fontSize: 14,
+    color: "#64748b",
     fontWeight: "500",
   },
   valueContainer: {
-    backgroundColor: "#f9fafb",
-    paddingHorizontal: 10,
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   value: {
-    fontSize: 16,
-    color: "#1f2937",
-    fontWeight: "500",
+    fontSize: 14,
+    color: "#1e293b",
+    fontWeight: "600",
   },
   descriptionContainer: {
-    marginTop: 10,
+    marginTop: 8,
   },
   description: {
-    fontSize: 15,
-    color: "#374151",
-    lineHeight: 22,
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
-  },
-  editButton: {
-    backgroundColor: "#2563eb",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  deleteButton: {
-    backgroundColor: "#dc2626",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: "#ffffff",
     fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
+    color: "#475569",
+    lineHeight: 20,
+    marginTop: 8,
   },
   modalContainer: {
     flex: 1,
@@ -290,55 +491,76 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#ffffff",
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 16,
+    padding: 24,
     width: "90%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 5,
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "600",
+    color: "#1e293b",
+  },
+  closeButton: {
+    padding: 8,
+  },
+  inputGroup: {
     marginBottom: 16,
-    color: "#1f2937",
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: "#64748b",
+    marginBottom: 8,
+    fontWeight: "500",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#e2e8f0",
     borderRadius: 8,
     padding: 12,
-    marginBottom: 12,
     fontSize: 16,
-    color: "#1f2937",
+    color: "#1e293b",
+    backgroundColor: "#f8fafc",
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: "top",
   },
   modalButtonContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 8,
   },
   modalButton: {
-    backgroundColor: "#3b82f6",
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 6,
+    minWidth: 100,
+    alignItems: "center",
   },
   cancelButton: {
-    backgroundColor: "#9ca3af",
+    backgroundColor: "#e2e8f0",
   },
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 50,
+  updateButton: {
+    backgroundColor: "#02c39a",
   },
-  emptyText: {
-    fontSize: 16,
-    color: "#6b7280",
-    textAlign: "center",
+  buttonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
   },
 });
