@@ -1,5 +1,3 @@
-
-
 import { collection, addDoc,getDoc, where, query, getDocs, startAfter,
    type QueryDocumentSnapshot,
   type DocumentData, limit, orderBy, 
@@ -745,27 +743,65 @@ export const deleteSeat = async (seatId: string) => {
 
 export const allotSeat = async (seatId: string, memberId: string, memberName: string, expiryDate: Date) => {
   try {
-    const currentUser = getAuth().currentUser
+    const currentUser = getAuth().currentUser;
     if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...")
+      throw new Error("User not authenticated. Please sign in again.");
     }
+
+    // Get seat document
     const seatCollection = collection(db, "seats");
     const seatDoc = doc(seatCollection, seatId);
     const seatData = await getDoc(seatDoc);
+
+    // Validate seat exists
     if (!seatData.exists()) {
-      throw new Error("Seat not found");
+      throw new Error("Seat not found. Please try again.");
     }
-    if (seatData.data().isAllocated) {
-      throw new Error("Seat is already allocated");
+
+    const seat = seatData.data();
+
+    // Validate seat is not already allocated
+    if (seat.isAllocated) {
+      throw new Error("This seat is already allocated to another member.");
     }
+
+    // Check if member already has a seat
+    const memberSeatsQuery = query(
+      collection(db, "seats"),
+      where("allocatedTo", "==", memberId)
+    );
+    const memberSeats = await getDocs(memberSeatsQuery);
+    
+    if (!memberSeats.empty) {
+      throw new Error("This member already has an allocated seat.");
+    }
+
+    // Validate expiry date
+    if (expiryDate < new Date()) {
+      throw new Error("Member's subscription has expired. Please renew the subscription first.");
+    }
+
+    // Update seat allocation
     await updateDoc(seatDoc, {
       isAllocated: true,
       allocatedTo: memberId,
       memberName: memberName,
       memberExpiryDate: expiryDate,
-      
+      lastUpdated: new Date(),
+      updatedBy: currentUser.uid
     });
-    return `Seat ${seatId} is allocated to member ${memberId}`;
+
+    return {
+      success: true,
+      message: `Seat ${seat.seatId} has been allocated to ${memberName}`,
+      data: {
+        seatId: seat.seatId,
+        roomNumber: seat.roomNumber,
+        roomType: seat.roomType,
+        memberName,
+        expiryDate
+      }
+    };
   } catch (error) {
     console.error("Error allocating seat:", error);
     throw error;

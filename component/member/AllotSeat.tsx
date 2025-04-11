@@ -9,8 +9,10 @@ import {
   Alert,
   TextInput,
   RefreshControl,
+  ScrollView,
+  Modal,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { fetchSeats, allotSeat, deallocateSeat } from "@/firebase/functions";
 import { getMembers } from "@/firebase/functions";
 import useStore from "@/hooks/store";
@@ -37,6 +39,7 @@ interface Seat {
 
 const AllocateSeatsPage: React.FC = () => {
   const [seats, setSeats] = useState<Seat[]>([]);
+  const [filteredSeats, setFilteredSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
@@ -47,6 +50,7 @@ const AllocateSeatsPage: React.FC = () => {
   const [selectedSeatData, setSelectedSeatData] = useState<Seat | null>(null);
   const [lastVisibleDoc, setLastVisibleDoc] = useState<any>(null);
   const [hasMoreMembers, setHasMoreMembers] = useState<boolean>(true);
+  const [selectedRoomType, setSelectedRoomType] = useState<RoomType | "All">("All");
 
   const currentUser = useStore((state: any) => state.currentUser);
   const activeLibrary = useStore((state: any) => state.activeLibrary);
@@ -78,6 +82,14 @@ const AllocateSeatsPage: React.FC = () => {
     }
   }, [searchQuery, members]);
 
+  useEffect(() => {
+    if (selectedRoomType === "All") {
+      setFilteredSeats(seats);
+    } else {
+      setFilteredSeats(seats.filter(seat => seat.roomType === selectedRoomType));
+    }
+  }, [seats, selectedRoomType]);
+
   const loadSeats = async () => {
     try {
       const fetchedSeats = await fetchSeats({
@@ -85,6 +97,7 @@ const AllocateSeatsPage: React.FC = () => {
         libraryId: activeLibrary.id,
       });
       setSeats(fetchedSeats);
+      setFilteredSeats(fetchedSeats);
     } catch (error) {
       console.error("Error fetching seats:", error);
       Alert.alert("Error", "Failed to load seats");
@@ -138,29 +151,51 @@ const AllocateSeatsPage: React.FC = () => {
     loadData();
   }, [loadData]);
 
- 
-
   const handleAllotSeat = async () => {
     if (!selectedSeat || !selectedMember) {
       Alert.alert("Error", "Please select a seat and a member.");
       return;
     }
 
+    if (!selectedSeatData) {
+      Alert.alert("Error", "Invalid seat selection. Please try again.");
+      return;
+    }
+
     setLoading(true);
     try {
-      await allotSeat(
+      const result = await allotSeat(
         selectedSeat,
         selectedMember.id,
         selectedMember.fullName,
         selectedMember.expiryDate
       );
-      Alert.alert("Success", "Seat allocated successfully");
-      await loadData();
-      setSelectedSeat(null);
-      setSelectedMember(null);
-      setSelectedSeatData(null);
-    } catch (error) {
-      Alert.alert("Error", "Failed to allocate seat");
+
+      if (result.success) {
+        Alert.alert(
+          "Success",
+          result.message,
+          [
+            {
+              text: "OK",
+              onPress: async () => {
+                await loadData();
+                setSelectedSeat(null);
+                setSelectedMember(null);
+                setSelectedSeatData(null);
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert("Error", result.message || "Failed to allocate seat");
+      }
+    } catch (error: any) {
+      console.error("Allocation error:", error);
+      Alert.alert(
+        "Error",
+        error.message || "Failed to allocate seat. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -236,103 +271,155 @@ const AllocateSeatsPage: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Allocate Room</Text>
+     
+
+      <View style={styles.filterSection}>
+        <Text style={styles.sectionTitle}>Filter Rooms</Text>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {["All", "AC", "Non-AC", "Dormitory"].map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.filterButton,
+                selectedRoomType === type && styles.selectedFilterButton,
+              ]}
+              onPress={() => setSelectedRoomType(type as RoomType | "All")}
+            >
+              <MaterialIcons
+                name={type === "AC" ? "ac-unit" : type === "Non-AC" ? "hotel" : "people"}
+                size={20}
+                color={selectedRoomType === type ? "#fff" : "#02c39a"}
+              />
+              <Text
+                style={[
+                  styles.filterButtonText,
+                  selectedRoomType === type && styles.selectedFilterButtonText,
+                ]}
+              >
+                {type}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       <FlatList
-        data={seats}
+        data={filteredSeats}
         renderItem={renderSeat}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         style={styles.seatsList}
+        contentContainerStyle={styles.seatsListContent}
       />
 
-      {selectedSeatData && (
-        <View style={styles.seatDetails}>
-          <View style={styles.seatDetailsHeader}>
-            <Text style={styles.seatDetailsTitle}>Bed Details</Text>
-            <TouchableOpacity onPress={() => setSelectedSeatData(null)}>
-              <MaterialIcons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.seatDetailsContent}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Bed ID:</Text>
-              <Text style={styles.detailValue}>{selectedSeatData.seatId}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Room:</Text>
-              <Text style={styles.detailValue}>
-                {selectedSeatData.roomNumber} ({selectedSeatData.roomType})
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Status:</Text>
-              <Text
-                style={[
-                  styles.detailValue,
-                  selectedSeatData.isAllocated
-                    ? styles.allocatedStatus
-                    : styles.availableStatus,
-                ]}
+      <Modal
+        visible={!!selectedSeatData}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedSeatData(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Room Details</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setSelectedSeatData(null)}
               >
-                {selectedSeatData.isAllocated ? "Allocated" : "Available"}
-              </Text>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
             </View>
 
-            {selectedSeatData.isAllocated ? (
-              <>
+            <View style={styles.modalBody}>
+              <View style={styles.detailCard}>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Member:</Text>
-                  <Text style={styles.detailValue}>
-                    {selectedSeatData.memberName}
+                  <Text style={styles.detailLabel}>Room Number:</Text>
+                  <Text style={styles.detailValue}>{selectedSeatData?.roomNumber}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Room Type:</Text>
+                  <Text style={styles.detailValue}>{selectedSeatData?.roomType}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Bed ID:</Text>
+                  <Text style={styles.detailValue}>{selectedSeatData?.seatId}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status:</Text>
+                  <Text
+                    style={[
+                      styles.detailValue,
+                      selectedSeatData?.isAllocated
+                        ? styles.allocatedStatus
+                        : styles.availableStatus,
+                    ]}
+                  >
+                    {selectedSeatData?.isAllocated ? "Allocated" : "Available"}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.deallocateButton}
-                  onPress={() => handleDeallocateSeat(selectedSeatData.id)}
-                >
-                  <Text style={styles.buttonText}>Deallocate Bed</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search members..."
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                <FlatList
-                  data={filteredMembers}
-                  renderItem={renderMember}
-                  keyExtractor={(item) => item.id}
-                  style={styles.membersList}
-                  ListEmptyComponent={
-                    <Text style={styles.emptyListText}>No available members found</Text>
-                  }
-                />
-                <TouchableOpacity
-                  style={[
-                    styles.allocateButton,
-                    !selectedMember && styles.disabledButton,
-                  ]}
-                  onPress={handleAllotSeat}
-                  disabled={!selectedMember || loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.buttonText}>Allocate Bed</Text>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
+              </View>
+
+              {selectedSeatData?.isAllocated ? (
+                <View style={styles.actionSection}>
+                  <View style={styles.memberInfo}>
+                    <Text style={styles.memberLabel}>Current Member:</Text>
+                    <Text style={styles.memberName}>{selectedSeatData.memberName}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deallocateButton}
+                    onPress={() => handleDeallocateSeat(selectedSeatData.id)}
+                  >
+                    <MaterialIcons name="person-remove" size={20} color="#fff" />
+                    <Text style={styles.buttonText}>Deallocate Bed</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.actionSection}>
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search members..."
+                    placeholderTextColor="#999"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                  <FlatList
+                    data={filteredMembers}
+                    renderItem={renderMember}
+                    keyExtractor={(item) => item.id}
+                    style={styles.membersList}
+                    ListEmptyComponent={
+                      <Text style={styles.emptyListText}>No available members found</Text>
+                    }
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.allocateButton,
+                      !selectedMember && styles.disabledButton,
+                    ]}
+                    onPress={handleAllotSeat}
+                    disabled={!selectedMember || loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <>
+                        <MaterialIcons name="person-add" size={20} color="#fff" />
+                        <Text style={styles.buttonText}>Allocate Bed</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 };
@@ -340,28 +427,83 @@ const AllocateSeatsPage: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: "#f8f9fa",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 16,
     color: "#333",
-    textAlign: "center",
+  },
+  refreshButton: {
+    padding: 8,
+  },
+  filterSection: {
+    padding: 16,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
+  filterScroll: {
+    paddingRight: 16,
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: "#f0f0f0",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    marginRight: 8,
+  },
+  selectedFilterButton: {
+    backgroundColor: "#02c39a",
+    borderColor: "#02c39a",
+  },
+  filterButtonText: {
+    color: "#666",
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  selectedFilterButtonText: {
+    color: "#fff",
   },
   seatsList: {
     flex: 1,
+  },
+  seatsListContent: {
+    padding: 16,
   },
   seatItem: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e0e0e0",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   selectedSeatItem: {
     borderColor: "#02c39a",
@@ -369,6 +511,14 @@ const styles = StyleSheet.create({
   },
   allocatedSeatItem: {
     borderColor: "#ff4444",
+  },
+  allocatedSeatText: {
+    color: "#ff4444",
+    fontWeight: "500",
+  },
+  availableSeatText: {
+    color: "#02c39a",
+    fontWeight: "500",
   },
   seatInfo: {
     flex: 1,
@@ -394,35 +544,44 @@ const styles = StyleSheet.create({
     color: "#02c39a",
     fontWeight: "500",
   },
-  memberName: {
-    fontSize: 14,
-    color: "#666",
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
-  seatDetails: {
+  modalContent: {
     backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 16,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
   },
-  seatDetailsHeader: {
+  modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  seatDetailsTitle: {
-    fontSize: 18,
+  modalTitle: {
+    fontSize: 20,
     fontWeight: "bold",
     color: "#333",
   },
-  seatDetailsContent: {
-    gap: 12,
+  closeButton: {
+    padding: 8,
+  },
+  modalBody: {
+    gap: 16,
+  },
+  detailCard: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    padding: 16,
   },
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    marginBottom: 12,
   },
   detailLabel: {
     fontSize: 16,
@@ -439,48 +598,50 @@ const styles = StyleSheet.create({
   availableStatus: {
     color: "#02c39a",
   },
+  actionSection: {
+    gap: 16,
+  },
   searchInput: {
-    height: 40,
+    height: 48,
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 8,
+    borderRadius: 12,
+    paddingHorizontal: 16,
     backgroundColor: "#fff",
+    fontSize: 16,
   },
   membersList: {
     maxHeight: 200,
-    marginBottom: 8,
   },
   memberItem: {
-    padding: 12,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
   selectedMemberItem: {
     backgroundColor: "#e7f3ff",
   },
- 
-  allocatedSeatText: {
-    fontSize: 14,
-    color: "#ff4444",
-    fontStyle: "italic",
-  },
-  availableSeatText: {
-    fontSize: 14,
-    color: "#02c39a",
+  memberName: {
+    fontSize: 16,
+    color: "#333",
   },
   allocateButton: {
-    backgroundColor: "#007bff",
-    padding: 14,
-    borderRadius: 8,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#02c39a",
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
   },
   deallocateButton: {
-    backgroundColor: "#ff4444",
-    padding: 14,
-    borderRadius: 8,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ff4444",
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
   },
   disabledButton: {
     opacity: 0.5,
@@ -494,6 +655,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#666",
     padding: 16,
+  },
+  memberInfo: {
+    backgroundColor: "#f8f9fa",
+    padding: 16,
+    borderRadius: 12,
+  },
+  memberLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 4,
   },
 });
 
