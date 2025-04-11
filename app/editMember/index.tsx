@@ -48,6 +48,7 @@ const UpdateMemberScreen = () => {
           setValue("email", data.email || "");
           setValue("totalAmount", data.totalAmount || "");
           setValue("paidAmount", data.paidAmount || "");
+          setValue("advancePayment", data.advancePayment || "0");
           setValue("discount", data.discount || "");
           setValue("dueAmount", data.dueAmount || "");
           setValue("address", data.address || "");
@@ -56,13 +57,20 @@ const UpdateMemberScreen = () => {
           setValue("admissionDate", data.addmissionDate.toDate() || "");
           setValue("expiryDate", data.expiryDate.toDate() || "");
           setValue("plan", data.plan || "");
-
+          setValue("planId", data.planId || "");
+          setValue("status", data.status || "active");
+          setValue("seatNumber", data.seatNumber || "");
         } else {
           Alert.alert("Error", "Member not found");
           router.back();
         }
       } catch (error) {
         console.error("Error fetching member:", error);
+        Toast.show({
+          type: "error",
+          text1: "Error fetching member data",
+          text2: "Please try again",
+        });
       } finally {
         setLoading(false);
       }
@@ -119,10 +127,27 @@ const formatDate = (date: any) => {
   });
 };
 
-
-
   const watchProfileImage = watch("profileImage")
   const watchDocument = watch("document")
+
+  // Watch for changes in relevant fields
+  const watchPaidAmount = watch("paidAmount");
+  const watchDiscount = watch("discount");
+  const watchTotalAmount = watch("totalAmount");
+
+  // Calculate due amount (excluding advance payment)
+  const calculateDueAmount = () => {
+    const total = parseFloat(watchTotalAmount) || 0;
+    const paid = parseFloat(watchPaidAmount) || 0;
+    const discount = parseFloat(watchDiscount) || 0;
+    const due = total - paid - discount;
+    setValue("dueAmount", due.toString());
+  };
+
+  // Update due amount when relevant fields change
+  useEffect(() => {
+    calculateDueAmount();
+  }, [watchTotalAmount, watchPaidAmount, watchDiscount]);
 
   if (loading) return <ActivityIndicator size="large" color="#6B46C1" style={styles.loading} />;
 
@@ -323,6 +348,29 @@ const formatDate = (date: any) => {
           </View>
         </View>
 
+        {/* Advance Payment Section */}
+        <View style={styles.advancePaymentSection}>
+          <Text style={styles.sectionTitle}>Advance Payment</Text>
+          <Controller
+            control={control}
+            render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Advance Amount</Text>
+                <TextInput
+                  style={[styles.input, error && styles.inputError]}
+                  placeholder="Enter advance payment amount"
+                  keyboardType="numeric"
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                />
+                {error && <Text style={styles.errorText}>{error.message}</Text>}
+              </View>
+            )}
+            name="advancePayment"
+          />
+        </View>
+
         {/* Admission Date */}
         <Controller
           control={control}
@@ -398,7 +446,7 @@ const formatDate = (date: any) => {
         </View>
 
         {/* Display Uploaded Files */}
-        {isLoading && <ActivityIndicator size="large" color="#6d28d9" />}
+        {isLoading && <ActivityIndicator size="large" color="#02c39a" />}
         {watchProfileImage && (
           <View style={styles.uploadedFileContainer}>
             <Text style={styles.uploadedFileText}>Profile Image:</Text>
@@ -425,7 +473,7 @@ const formatDate = (date: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffff", // Light purple background
+    backgroundColor: "#ffff",
   },
   formContainer: {
     padding: 20,
@@ -434,7 +482,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   submitButton: {
-    backgroundColor: "#6d28d9", // Dark purple button
+    backgroundColor: "#02c39a",
     borderRadius: 8,
     padding: 12,
     alignItems: "center",
@@ -539,7 +587,7 @@ const styles = StyleSheet.create({
   },
   uploadedFileLink: {
     fontSize: 14,
-    color: "#6d28d9", // Dark purple link
+    color: "#02c39a",
     textDecorationLine: "underline",
   },
   uploadedImage: {
@@ -548,7 +596,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 8,
   },
- 
   amountRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -569,6 +616,20 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
+  },
+  advancePaymentSection: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#212529",
+    marginBottom: 12,
   },
 })
 

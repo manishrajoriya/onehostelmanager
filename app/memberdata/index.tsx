@@ -39,6 +39,7 @@ interface MemberDetails {
   discount: number
   planId: string
   plan: string
+  advancePayment: number
 }
 
 interface DetailRowProps {
@@ -330,8 +331,8 @@ const MemberDetails: React.FC = () => {
             <Text style={styles.planValue}>{member.expiryDate.toDateString()}</Text>
             <Text style={styles.planLabel}>Discount</Text>
             <Text style={styles.planValue}>{member.discount || "00"}</Text>
-            <Text style={styles.planLabel}>Tax/Enrolment</Text>
-            <Text style={styles.planValue}>0/0</Text>
+            <Text style={styles.planLabel}>Advance Payment</Text>
+            <Text style={styles.planValue}>{member.advancePayment || "00"}</Text>
             <Text style={[styles.planLabel, styles.dueAmount]}>Due Amount</Text>
             <Text style={[styles.planValue, styles.dueAmount]}>{member.dueAmount}</Text>
           </View>

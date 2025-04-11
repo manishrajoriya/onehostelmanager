@@ -68,6 +68,7 @@ export interface FormData {
   plan: string;
   totalAmount: string;
   paidAmount: string;
+  advancePayment: string;
   dueAmount: string;
   discount: string;
   profileImage: string;

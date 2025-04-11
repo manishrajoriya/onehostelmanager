@@ -247,7 +247,7 @@ export default function AddMemberForm() {
           name="plan"
         />
 
-        {/* Total, Paid, and Due Amount */}
+        {/* Amount Section */}
         <View style={styles.amountSection}>
           <View style={styles.amountRow}>
             <Controller
@@ -294,7 +294,7 @@ export default function AddMemberForm() {
             <Controller
               control={control}
               render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
-                <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
+                <View style={[styles.inputGroup, styles.flex1]}>
                   <Text style={styles.label}>Discount</Text>
                   <TextInput
                     style={[styles.input, error && styles.inputError]}
@@ -309,7 +309,9 @@ export default function AddMemberForm() {
               )}
               name="discount"
             />
+          </View>
 
+          <View style={styles.amountRow}>
             <Controller
               control={control}
               render={({ field: { onChange, onBlur, value } }) => (
@@ -329,6 +331,29 @@ export default function AddMemberForm() {
               name="dueAmount"
             />
           </View>
+        </View>
+
+        {/* Advance Payment Section */}
+        <View style={styles.advancePaymentSection}>
+          <Text style={styles.sectionTitle}>Advance Payment</Text>
+          <Controller
+            control={control}
+            render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Advance Amount</Text>
+                <TextInput
+                  style={[styles.input, error && styles.inputError]}
+                  placeholder="Enter advance payment amount"
+                  keyboardType="numeric"
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                />
+                {error && <Text style={styles.errorText}>{error.message}</Text>}
+              </View>
+            )}
+            name="advancePayment"
+          />
         </View>
 
         {/* Admission Date */}
@@ -519,22 +544,16 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
   },
-  amountItem: {
+  amountRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
-  amountLabel: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#4b5563",
-    marginBottom: 4,
+  marginRight: {
+    marginRight: 10,
   },
-  amountInput: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 6,
-    padding: 8,
-    fontSize: 16,
+  flex1: {
+    flex: 1,
   },
   dateButton: {
     borderWidth: 1,
@@ -569,16 +588,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 8,
   },
- 
-  amountRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  advancePaymentSection: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
   },
-  marginRight: {
-    marginRight: 10,
-  },
-  flex1: {
-    flex: 1,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#212529",
+    marginBottom: 12,
   },
 })
 

@@ -176,8 +176,6 @@ export async function deletePlan({ id }: { id: string }) {
 
 export async function addMember({currentUser, libraryId, data}: {currentUser: User, libraryId: string, data: any}) {
   try {
-    // Get the current user
-    // const currentUser = getAuth().currentUser;
     if (!currentUser) {
       throw new Error("User not authenticated. Redirecting to sign-in...");
     }
@@ -197,6 +195,7 @@ export async function addMember({currentUser, libraryId, data}: {currentUser: Us
       dueAmount: data?.dueAmount,
       totalAmount: data?.totalAmount,
       paidAmount: data?.paidAmount,
+      advancePayment: data?.advancePayment || "0",
       discount: data?.discount,
       planId: data?.planId,
       plan: data?.plan,
@@ -208,7 +207,7 @@ export async function addMember({currentUser, libraryId, data}: {currentUser: Us
     return memberRef.id;
   } catch (error: any) {
     console.error("Unable to create member:", error.message);
-    throw error; // Re-throw the error for handling by the caller
+    throw error;
   }
 }
 
@@ -396,6 +395,7 @@ export async function updateMember({
     dueAmount: number;
     totalAmount: number;
     paidAmount: number;
+    advancePayment: string;
     discount: number;
     planId: string;
     plan: string;
@@ -417,7 +417,7 @@ export async function updateMember({
     return true;
   } catch (error: any) {
     console.error("Error updating member:", error.message);
-    throw error; // Propagate error
+    throw error;
   }
 }
 
@@ -455,6 +455,7 @@ export async function getMemberById({ id }: { id: string }) {
       dueAmount: memberSnapshot.data().dueAmount,
       totalAmount: memberSnapshot.data().totalAmount,
       paidAmount: memberSnapshot.data().paidAmount,
+      advancePayment: memberSnapshot.data().advancePayment || "0",
       discount: memberSnapshot.data().discount,
       planId: memberSnapshot.data().planId,
       plan: memberSnapshot.data().plan,

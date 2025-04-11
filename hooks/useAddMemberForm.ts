@@ -14,12 +14,15 @@ export const useAddMemberForm = () => {
       plan: "",
       totalAmount: "",
       paidAmount: "",
+      advancePayment: "",
       dueAmount: "",
       discount: "",
       profileImage: "",
       document: "",
       admissionDate: new Date(),
       expiryDate: new Date(),
+      status: "active",
+      seatNumber: "",
       planId: "",
     },
   })
@@ -33,13 +36,38 @@ export const useAddMemberForm = () => {
   const currentUser = useStore((state: any) => state.currentUser);
   const activeLibrary = useStore((state: any) => state.activeLibrary);
 
+  // Watch for changes in relevant fields
+  const watchPlan = watch("plan")
+  const watchPaidAmount = watch("paidAmount")
+  const watchDiscount = watch("discount")
+  const watchTotalAmount = watch("totalAmount")
+  const watchAdvancePayment = watch("advancePayment")
+
+  // Calculate due amount (excluding advance payment)
+  const calculateDueAmount = () => {
+    const total = parseFloat(watchTotalAmount) || 0
+    const paid = parseFloat(watchPaidAmount) || 0
+    const discount = parseFloat(watchDiscount) || 0
+    const due = total - paid - discount
+    setValue("dueAmount", due.toString())
+  }
+
+  // Update due amount when relevant fields change
   useEffect(() => {
-    const fetchPlans = async () => {
-      const plansData = await getPlans({libraryId: activeLibrary.id, currentUser})
-      setPlans(plansData)
+    calculateDueAmount()
+  }, [watchTotalAmount, watchPaidAmount, watchDiscount])
+
+  useEffect(() => {
+    const fetchPlansData = async () => {
+      try {
+        const plansData = await getPlans({ libraryId: activeLibrary.id, currentUser })
+        setPlans(plansData)
+      } catch (error) {
+        console.error("Error fetching plans:", error)
+      }
     }
-    fetchPlans()
-  }, [])
+    fetchPlansData()
+  }, [currentUser, activeLibrary.id])
 
   useEffect(() => {
     const planId = watch("planId")
@@ -52,14 +80,6 @@ export const useAddMemberForm = () => {
       fetchPlan()
     }
   }, [watch("planId"), setValue]) // Added setValue to dependencies
-
-  useEffect(() => {
-    const paidAmount = Number.parseFloat(watch("paidAmount")) || 0
-    const totalAmount = Number.parseFloat(watch("totalAmount")) || 0
-    const discount = Number.parseFloat(watch("discount")) || 0
-    const dueAmount = totalAmount - paidAmount - discount
-    setValue("dueAmount", dueAmount.toFixed(2))
-  }, [watch("paidAmount"), watch("totalAmount"), watch("discount"), setValue]) // Added setValue to dependencies
 
   useEffect(() => {
     const admissionDate = watch("admissionDate")
