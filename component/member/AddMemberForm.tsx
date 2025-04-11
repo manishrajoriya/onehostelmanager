@@ -12,13 +12,16 @@ import {
 import { Controller } from "react-hook-form"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import { Picker } from "@react-native-picker/picker"
-import { addMember } from "@/firebase/functions"
+import { addMember, totalMemberCount } from "@/firebase/functions"
 import Toast from "react-native-toast-message"
 import { useAddMemberForm } from "@/hooks/useAddMemberForm"
 
 import { pickImage, uploadImageToFirebase, pickImageSource } from "./ImageUpload"
 import type { FormData } from "@/types/MemberProfile"
 import useStore from "@/hooks/store"
+import { checkSubscriptionStatus } from "@/firebase/subscription"
+import { PaywallModal } from "@/component/PayWallMember";
+import { useEffect, useState } from "react"
 
 export const formatDate = (date: Date) => {
   return date.toLocaleDateString("en-GB", {
@@ -45,25 +48,71 @@ export default function AddMemberForm() {
   const currentUser = useStore((state: any) => state.currentUser)
   const activeLibrary = useStore((state: any) => state.activeLibrary)
 
+   const [memberCount, setMemberCount] = useState(0);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+
+  //paywall
+  useEffect(() => {
+    const checkLimits = async () => {
+      try {
+        const count = await totalMemberCount({ libraryId: activeLibrary.id, currentUser });
+        setMemberCount(count);
+        
+        const subscribed = await checkSubscriptionStatus();
+        setIsSubscribed(subscribed);
+      } catch (error) {
+        console.error('Error checking limits:', error);
+      } finally {
+        setSubscriptionLoading(false);
+      }
+    };
+    
+    checkLimits();
+  }, [activeLibrary.id, currentUser]);
+
+
   const onSubmit = async (data: FormData) => {
-    try {
-      await addMember({ data, currentUser, libraryId: activeLibrary.id })
-      Toast.show({
-        type: "success",
-        text1: "Member added successfully",
-      })
-      // Reset form
-      Object.keys(data).forEach((key) => setValue(key as keyof FormData, ""))
-      setValue("admissionDate", new Date())
-      setValue("expiryDate", new Date())
-    } catch (error) {
-      console.error("Error adding member: ", error)
-      Toast.show({
-        type: "error",
-        text1: "Failed to add member",
-        text2: "Please try again",
-      })
+     
+     if (memberCount >= 2 && !isSubscribed) {
+      setShowPaywall(true);
+      return;
     }
+
+    try {
+      await addMember({ data, currentUser, libraryId: activeLibrary.id });
+      Toast.show({
+        type: 'success',
+        text1: 'Member added successfully',
+      });
+      // Reset form and update count
+      Object.keys(data).forEach((key) => setValue(key as keyof FormData, ''));
+      setValue('admissionDate', new Date());
+      setValue('expiryDate', new Date());
+      setMemberCount(prev => prev + 1);
+    } catch (error) {
+      console.error('Error adding member: ', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to add member',
+        text2: 'Please try again',
+      });
+    }
+  };
+
+  const handleSubscriptionComplete = () => {
+    setIsSubscribed(true);
+    // Optionally refresh member count or other data
+  };
+
+
+   if (subscriptionLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#02c39a" />
+      </View>
+    );
   }
 
   const handleImagePick = async (field: "profileImage" | "document") => {
@@ -376,6 +425,14 @@ export default function AddMemberForm() {
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
+
+        {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onSubscriptionComplete={handleSubscriptionComplete}
+      />
+
       <Toast />
     </ScrollView>
   )
@@ -402,6 +459,11 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: "#fff",
     fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   uploadButtonsContainer: {
     flexDirection: "row",
