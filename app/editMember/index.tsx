@@ -53,10 +53,12 @@ const UpdateMemberScreen = () => {
           setValue("address", data.address || "");
           setValue("profileImage", data.profileImage || "");
           setValue("document", data.document || "");
-          setValue("admissionDate", data.addmissionDate.toDate() || "");
-          setValue("expiryDate", data.expiryDate.toDate() || "");
+          setValue("admissionDate", data.addmissionDate?.toDate() || new Date());
+          setValue("expiryDate", data.expiryDate?.toDate() || new Date());
           setValue("plan", data.plan || "");
-
+          setValue("planId", data.planId || "");
+          setValue("status", data.status || "active");
+          setValue("seatNumber", data.seatNumber || "");
         } else {
           Alert.alert("Error", "Member not found");
           router.back();
