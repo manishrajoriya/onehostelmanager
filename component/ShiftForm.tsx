@@ -18,6 +18,12 @@ interface FormData {
   amount: string;
 }
 
+interface FormErrors {
+  name?: string;
+  duration?: string;
+  amount?: string;
+}
+
 export default function ShiftForm() {
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -26,35 +32,122 @@ export default function ShiftForm() {
     amount: '',
   });
 
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const currentUser = useStore((state: any) => state.currentUser);
   const activeLibrary = useStore((state: any) => state.activeLibrary);
 
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Plan name is required';
+      isValid = false;
+    }
+
+    if (!formData.duration.trim()) {
+      newErrors.duration = 'Duration is required';
+      isValid = false;
+    } else if (isNaN(Number(formData.duration)) || Number(formData.duration) <= 0) {
+      newErrors.duration = 'Duration must be a positive number';
+      isValid = false;
+    }
+
+    if (!formData.amount.trim()) {
+      newErrors.amount = 'Amount is required';
+      isValid = false;
+    } else if (isNaN(Number(formData.amount)) || Number(formData.amount) <= 0) {
+      newErrors.amount = 'Amount must be a positive number';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
   const handleSubmit = async () => {
-    await createPlan({ data: formData, currentUser, libraryId: activeLibrary.id });
-    Toast.show({
-      type: 'success',
-      text1: 'Plan created successfully',
-    });
-    setFormData({
-      name: '',
-      description: '',
-      duration: '',
-      amount: '',
-    });
+    if (!validateForm()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please check the form for errors',
+        position: 'top',
+        visibilityTime: 3000,
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createPlan({ data: formData, currentUser, libraryId: activeLibrary.id });
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Plan created successfully',
+        position: 'top',
+        visibilityTime: 3000,
+      });
+
+      setFormData({
+        name: '',
+        description: '',
+        duration: '',
+        amount: '',
+      });
+      setErrors({});
+    } catch (error: any) {
+      console.error('Error creating plan:', error);
+      
+      let errorMessage = 'An error occurred while creating the plan';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.code) {
+        switch (error.code) {
+          case 'permission-denied':
+            errorMessage = 'You do not have permission to create plans';
+            break;
+          case 'unavailable':
+            errorMessage = 'Service is currently unavailable. Please try again later';
+            break;
+          default:
+            errorMessage = `Error: ${error.code}`;
+        }
+      }
+
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMessage,
+        position: 'top',
+        visibilityTime: 4000,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.formContainer}>
         <Text style={styles.header}>Create a New Plan</Text>
+        
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Name</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.name && styles.inputError]}
             placeholder="Plan Name"
             value={formData.name}
-            onChangeText={(text) => setFormData({ ...formData, name: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, name: text });
+              if (errors.name) {
+                setErrors({ ...errors, name: undefined });
+              }
+            }}
           />
+          {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
         </View>
 
         <View style={styles.inputGroup}>
@@ -72,27 +165,45 @@ export default function ShiftForm() {
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Duration (in days)</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.duration && styles.inputError]}
             placeholder="Duration in days"
             keyboardType="numeric"
             value={formData.duration}
-            onChangeText={(text) => setFormData({ ...formData, duration: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, duration: text });
+              if (errors.duration) {
+                setErrors({ ...errors, duration: undefined });
+              }
+            }}
           />
+          {errors.duration && <Text style={styles.errorText}>{errors.duration}</Text>}
         </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Amount</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.amount && styles.inputError]}
             placeholder="Amount"
             keyboardType="numeric"
             value={formData.amount}
-            onChangeText={(text) => setFormData({ ...formData, amount: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, amount: text });
+              if (errors.amount) {
+                setErrors({ ...errors, amount: undefined });
+              }
+            }}
           />
+          {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Submit</Text>
+        <TouchableOpacity 
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? 'Creating...' : 'Submit'}
+          </Text>
         </TouchableOpacity>
         <Toast />
       </View>
@@ -144,12 +255,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  inputError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
   textArea: {
     height: 120,
     textAlignVertical: 'top',
   },
   submitButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#02c39a',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -159,9 +279,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  submitButtonDisabled: {
+    backgroundColor: '#94a3b8',
+    opacity: 0.7,
+  },
   submitButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
 });
+
