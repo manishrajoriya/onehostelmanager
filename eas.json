@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 15.0.9",
+    "version": ">= 5.9.1",
     "appVersionSource": "remote"
   },
   "build": {
@@ -15,7 +15,16 @@
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDg-zuRagYu1liAb51VyvpnKRo2-HduNM4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "one-hostel.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "one-hostel",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "one-hostel.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "217645962699",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:217645962699:web:ddc0a944eb5c4258bc524e",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-XVYGEQYVBR"
+      }
     }
   },
   "submit": {

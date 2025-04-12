@@ -55,7 +55,6 @@ const CustomDrawerContent = (props: any) => {
     <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
       <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: 0 }}>
         {/* Drawer Header */}
-        {/* yellow color */}
         <LinearGradient
           colors={["#02c39a", "#02c39a"]}
           start={{ x: 0, y: 0 }}
@@ -64,110 +63,107 @@ const CustomDrawerContent = (props: any) => {
         >
           <Text style={styles.headerText}>One Hostel</Text>
         </LinearGradient>
-        {/* Direct Drawer Items */}
+
+        {/* Main Navigation */}
         <DrawerItem
           label="Home"
-          icon="home-outline"
+          icon="home"
           onPress={() => props.navigation.navigate("Home")}
           isActive={activeRoute === "Home"}
         />
+
+        {/* Hostel Management Section */}
+        <Text style={styles.sectionTitle}>Hostel Management</Text>
         <DrawerItem
           label="Add Hostel"
-          icon="library-outline"
+          icon="business"
           onPress={() => props.navigation.navigate("AddLibrary")}
           isActive={activeRoute === "AddLibrary"}
         />
         <DrawerItem
           label="Add Room"
-          icon="add-outline"
+          icon="bed"
           onPress={() => props.navigation.navigate("AddSeats")}
           isActive={activeRoute === "AddSeats"}
         />
+        <DrawerItem
+          label="Allot Room"
+          icon="people"
+          onPress={() => props.navigation.navigate("AllotSeat")}
+          isActive={activeRoute === "AllotSeat"}
+        />
 
-        {/* Line Separator */}
-        <View style={styles.separator} />
         {/* Members Section */}
         <Text style={styles.sectionTitle}>Members</Text>
         <DrawerItem
           label="Add Member"
-          icon="person-add-outline"
+          icon="person-add"
           onPress={() => props.navigation.navigate("AddMember")}
           isActive={activeRoute === "AddMember"}
         />
         <DrawerItem
-          label="Allot Room"
-          icon="person-add-outline"
-          onPress={() => props.navigation.navigate("AllotSeat")}
-          isActive={activeRoute === "AllotSeat"}
-        />
-        <DrawerItem
           label="Profile"
-          icon="person-outline"
+          icon="person"
           onPress={() => props.navigation.navigate("Profile")}
           isActive={activeRoute === "Profile"}
         />
         <DrawerItem
           label="Member Payment"
-          icon="card-outline"
+          icon="wallet"
           onPress={() => props.navigation.navigate("MemberPayment")}
           isActive={activeRoute === "MemberPayment"}
         />
-        {/* Line Separator */}
-        <View style={styles.separator} />
-        {/* Shifts Section */}
+
+        {/* Room Plan Section */}
         <Text style={styles.sectionTitle}>Room Plan</Text>
         <DrawerItem
           label="Add Plan"
-          icon="calendar-outline"
+          icon="calendar"
           onPress={() => props.navigation.navigate("ShiftForm")}
           isActive={activeRoute === "ShiftForm"}
         />
         <DrawerItem
           label="Plan Details"
-          icon="document-text-outline"
+          icon="list"
           onPress={() => props.navigation.navigate("ShiftDetails")}
           isActive={activeRoute === "ShiftDetails"}
         />
-        {/* Line Separator */}
-        <View style={styles.separator} />
+
         {/* Finance Section */}
         <Text style={styles.sectionTitle}>Finance</Text>
         <DrawerItem
           label="Finance"
-          icon="card-outline"
+          icon="cash"
           onPress={() => props.navigation.navigate("Finance")}
           isActive={activeRoute === "Finance"}
         />
-        {/* Removed Pricing Section */}
-        {/* Line Separator */}
-        <View style={styles.separator} />
+
         {/* Attendance Section */}
         <Text style={styles.sectionTitle}>Attendance</Text>
         <DrawerItem
           label="Attendance"
-          icon="checkbox-outline"
+          icon="checkmark-circle"
           onPress={() => props.navigation.navigate("Attendance")}
           isActive={activeRoute === "Attendance"}
         />
         <DrawerItem
           label="Attendance Report"
-          icon="bar-chart-outline"
+          icon="bar-chart"
           onPress={() => props.navigation.navigate("AttendanceReport")}
           isActive={activeRoute === "AttendanceReport"}
         />
-        {/* Line Separator */}
-        <View style={styles.separator} />
+
         {/* Others Section */}
         <Text style={styles.sectionTitle}>Others</Text>
         <DrawerItem
           label="Download Members"
-          icon="download-outline"
+          icon="download"
           onPress={() => props.navigation.navigate("DownloadMembers")}
           isActive={activeRoute === "DownloadMembers"}
         />
         <DrawerItem
           label="Logout"
-          icon="log-out-outline"
+          icon="log-out"
           onPress={() => props.navigation.navigate("Logout")}
           isActive={activeRoute === "Logout"}
         />
