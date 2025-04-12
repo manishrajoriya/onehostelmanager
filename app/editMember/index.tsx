@@ -50,6 +50,7 @@ const UpdateMemberScreen = () => {
           setValue("paidAmount", data.paidAmount || "");
           setValue("discount", data.discount || "");
           setValue("dueAmount", data.dueAmount || "");
+          setValue("advanceAmount", data.advanceAmount || "");
           setValue("address", data.address || "");
           setValue("profileImage", data.profileImage || "");
           setValue("document", data.document || "");
@@ -239,7 +240,28 @@ const formatDate = (date: any) => {
             </View>
           )}
           name="plan"
+          />
+         
+         {/* Advance Amount */}
+         <Controller
+          control={control}
+          render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Advance Amount</Text>
+              <TextInput
+                style={[styles.input, error && styles.inputError]}
+                placeholder="Advance Amount"
+                keyboardType="numeric"
+                onBlur={onBlur}
+                onChangeText={onChange}
+                value={value}
+              />
+              {error && <Text style={styles.errorText}>{error.message}</Text>}
+            </View>
+          )}
+          name="advanceAmount"
         />
+        
 
         {/* Total, Paid, and Due Amount */}
         <View style={styles.amountSection}>

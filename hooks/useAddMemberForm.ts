@@ -16,6 +16,7 @@ export const useAddMemberForm = () => {
       paidAmount: "",
       dueAmount: "",
       discount: "",
+      advanceAmount: "",
       profileImage: "",
       document: "",
       admissionDate: new Date(),

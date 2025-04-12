@@ -200,6 +200,7 @@ export async function addMember({currentUser, libraryId, data}: {currentUser: Us
       totalAmount: data?.totalAmount,
       paidAmount: data?.paidAmount,
       discount: data?.discount,
+      advanceAmount: data?.advanceAmount,
       planId: data?.planId,
       plan: data?.plan,
       createdAt: new Date(),
@@ -251,6 +252,7 @@ export async function getMembers({ pageSize, lastVisible, currentUser, libraryId
       totalAmount: doc.data().totalAmount,
       paidAmount: doc.data().paidAmount,
       discount: doc.data().discount,
+      advanceAmount: doc.data().advanceAmount,
       planId: doc.data().planId,
       plan: doc.data().plan,
       createdAt: doc.data().createdAt,
@@ -399,6 +401,7 @@ export async function updateMember({
     totalAmount: number;
     paidAmount: number;
     discount: number;
+    advanceAmount: number;
     planId: string;
     plan: string;
   }>;
@@ -458,6 +461,7 @@ export async function getMemberById({ id }: { id: string }) {
       totalAmount: memberSnapshot.data().totalAmount,
       paidAmount: memberSnapshot.data().paidAmount,
       discount: memberSnapshot.data().discount,
+      advanceAmount: memberSnapshot.data().advanceAmount,
       planId: memberSnapshot.data().planId,
       plan: memberSnapshot.data().plan,
       createdAt: memberSnapshot.data().createdAt,

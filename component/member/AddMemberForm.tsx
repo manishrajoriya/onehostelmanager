@@ -2,7 +2,7 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  TouchableOpacity,               
   StyleSheet,
   ScrollView,
   Platform,
@@ -246,6 +246,28 @@ export default function AddMemberForm() {
           )}
           name="plan"
         />
+        {/* Advance Amount */}
+        <Controller
+          control={control}
+          render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Advance Amount</Text>
+              <TextInput
+                style={[styles.input, error && styles.inputError]}
+                placeholder="Advance Amount"
+                keyboardType="numeric"
+                onBlur={onBlur}
+                onChangeText={onChange}
+                value={value}
+              />
+              {error && <Text style={styles.errorText}>{error.message}</Text>}
+            </View>
+          )}
+          name="advanceAmount"
+        />
+        
+        
+        
 
         {/* Total, Paid, and Due Amount */}
         <View style={styles.amountSection}>

@@ -50,6 +50,7 @@ interface InvoiceData {
   paidAmount: number;
   dueAmount: number;
   discount: number;
+  advanceAmount: number;
 }
 
 export async function generateAndShareInvoice(data: InvoiceData) {
@@ -59,7 +60,7 @@ export async function generateAndShareInvoice(data: InvoiceData) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
         <style>
           body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; }
-          h1 { text-align: center; color: #6B46C1; }
+          h1 { text-align: center; color: #02c39a; }
           .invoice-details, .member-details, .plan-details { margin-bottom: 20px; }
           table { width: 100%; border-collapse: collapse; }
           th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -85,6 +86,7 @@ export async function generateAndShareInvoice(data: InvoiceData) {
           <p><strong>Plan:</strong> ${data.planName}</p>
           <p><strong>Admission Date:</strong> ${data.admissionDate}</p>
           <p><strong>Expiry Date:</strong> ${data.expiryDate}</p>
+          <p><strong>Advance Amount:</strong> ${data.advanceAmount}</p>
         </div>
         <table>
           <tr>
@@ -100,16 +102,17 @@ export async function generateAndShareInvoice(data: InvoiceData) {
             <td>₹${data.paidAmount}</td>
           </tr>
           <tr>
-            <td><strong>Due Amount</strong></td>
-            <td><strong>₹${data.dueAmount}</strong></td>
-          </tr>
-          <tr>
             <td><strong>Discount</strong></td>
             <td><strong>₹${data.discount}</strong></td>
           </tr>
+          <tr>
+            <td><strong>Due Amount</strong></td>
+            <td><strong>₹${data.dueAmount}</strong></td>
+          </tr>
+         
         </table>
         <div style="margin-top: 40px; text-align: center;">
-          <p>Thank you for your business!</p>
+          <p>Thank you for your business! Visit again One Hostel Manager App</p>
         </div>
       </body>
     </html>

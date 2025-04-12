@@ -70,6 +70,7 @@ export interface FormData {
   paidAmount: string;
   dueAmount: string;
   discount: string;
+  advanceAmount: string;
   profileImage: string;
   document: string;
   admissionDate: Date;
