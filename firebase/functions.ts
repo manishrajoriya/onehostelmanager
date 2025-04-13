@@ -71,7 +71,7 @@ export async function updateLibrary({ id, data }: { id: string, data: any }) {
       address: data.address,
       description: data.description
     });
-    console.log('Library updated successfully');
+    // console.log('Library updated successfully');
   } catch (error) {
     console.error('Error updating library:', error);
     throw error;
@@ -94,7 +94,7 @@ export async function createPlan({ data, currentUser, libraryId }: { data: PlanD
      libraryId: libraryId
    });
 
-    console.log('Plan created successfully with ID:', planRef.id);
+    // console.log('Plan created successfully with ID:', planRef.id);
     return { id: planRef.id, ...data,  };
   } catch (error: any) {
     console.error('Unable to create plan:', error.message);
@@ -131,7 +131,7 @@ export async function getPlanById({ id, }: { id: string, }) {
     }
     
     const planData = planSnapshot.data();
-    console.log('Plan fetched successfully:', { id, name: planData.name });
+    
     return { id, name: planData.name, description: planData.description, duration: planData.duration, amount: planData.amount };
   } catch (error: any) {
     console.error('Unable to get plan:', error.message);
@@ -149,7 +149,7 @@ export async function updatePlan({ id, data, currentUser,  }: { id: string, data
     // Update the plan in the Firestore database
     const planRef = doc(db, 'plans', id);
     await updateDoc(planRef, data);
-    console.log('Plan updated successfully:', { id, ...data });
+    
     return { id, ...data };
   } catch (error: any) {
     console.error('Unable to update plan:', error.message);
