@@ -1,5 +1,3 @@
-
-
 import { collection, addDoc,getDoc, where, query, getDocs, startAfter,
    type QueryDocumentSnapshot,
   type DocumentData, limit, orderBy, 
@@ -201,7 +199,7 @@ export async function addMember({currentUser, libraryId, data}: {currentUser: Us
       paidAmount: data?.paidAmount,
       discount: data?.discount,
       advanceAmount: data?.advanceAmount,
-      planId: data?.planId,
+      planIds: [data?.planId], // Changed to array to store multiple plan IDs
       plan: data?.plan,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -272,115 +270,6 @@ export async function getMembers({ pageSize, lastVisible, currentUser, libraryId
   }
 }
 
-export async function getExpiredMembers({ pageSize, lastVisible, currentUser, libraryId }: { pageSize: number, lastVisible: QueryDocumentSnapshot<DocumentData> | undefined, currentUser: any, libraryId: string }) {
-  try {
-    
-    if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...");
-    }
-
-    let q = query(
-      collection(db, "members"),
-      where("admin", "==", currentUser.uid),
-      where("libraryId", "==", libraryId),
-      where("expiryDate", "<", new Date()),
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
-
-    // Apply pagination if a last visible document exists
-    if (lastVisible) {
-      q = query(q, startAfter(lastVisible));
-    }
-
-    const membersSnapshot = await getDocs(q);
-
-    const members = membersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      fullName: doc.data().fullName,
-      address: doc.data().address,
-      contactNumber: doc.data().contactNumber,
-      email: doc.data().email,
-      addmissionDate: doc.data().addmissionDate.toDate(),
-      expiryDate: doc.data().expiryDate.toDate(),
-      profileImage: doc.data().profileImage,
-      document: doc.data().document,
-      dueAmount: doc.data().dueAmount,
-      totalAmount: doc.data().totalAmount,
-      paidAmount: doc.data().paidAmount,
-      planId: doc.data().planId,
-      plan: doc.data().plan,
-      createdAt: doc.data().createdAt,
-      updatedAt: doc.data().updatedAt,
-    }));
-
-    // Get the last document for pagination
-    const lastVisibleDoc = membersSnapshot.docs[membersSnapshot.docs.length - 1];
-
-    // Determine if there are more members to fetch
-    const hasMore = membersSnapshot.docs.length === pageSize;
-
-    return { members, lastVisibleDoc, hasMore };
-  } catch (error: any) {
-    console.error("Unable to get members:", error.message);
-    throw error;
-  }
-}
-
-export async function getLiveMembers({ pageSize, lastVisible, currentUser, libraryId }: { pageSize: number, lastVisible: QueryDocumentSnapshot<DocumentData> | undefined, currentUser: any, libraryId: string }) {
-  try {
-    
-    if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...");
-    }
-
-    let q = query(
-      collection(db, "members"),
-      where("admin", "==", currentUser.uid),
-      where("libraryId", "==", libraryId),
-      where("expiryDate", ">", new Date()),
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
-
-    // Apply pagination if a last visible document exists
-    if (lastVisible) {
-      q = query(q, startAfter(lastVisible));
-    }
-
-    const membersSnapshot = await getDocs(q);
-
-    const members = membersSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      fullName: doc.data().fullName,
-      address: doc.data().address,
-      contactNumber: doc.data().contactNumber,
-      email: doc.data().email,
-      addmissionDate: doc.data().addmissionDate.toDate(),
-      expiryDate: doc.data().expiryDate.toDate(),
-      profileImage: doc.data().profileImage,
-      document: doc.data().document,
-      dueAmount: doc.data().dueAmount,
-      totalAmount: doc.data().totalAmount,
-      paidAmount: doc.data().paidAmount,
-      planId: doc.data().planId,
-      plan: doc.data().plan,
-      createdAt: doc.data().createdAt,
-      updatedAt: doc.data().updatedAt,
-    }));
-
-    // Get the last document for pagination
-    const lastVisibleDoc = membersSnapshot.docs[membersSnapshot.docs.length - 1];
-
-    // Determine if there are more members to fetch
-    const hasMore = membersSnapshot.docs.length === pageSize;
-
-    return { members, lastVisibleDoc, hasMore };
-  } catch (error: any) {
-    console.error("Unable to get members:", error.message);
-    throw error;
-  }
-}
 
 
 export async function updateMember({
@@ -402,7 +291,7 @@ export async function updateMember({
     paidAmount: number;
     discount: number;
     advanceAmount: number;
-    planId: string;
+    planIds: string[];
     plan: string;
   }>;
 }) {
@@ -445,28 +334,52 @@ export async function getMemberById({ id }: { id: string }) {
     if (!memberSnapshot.exists()) {
       throw new Error(`Member with ID ${id} does not exist`)
     }
+    
+    const memberData = memberSnapshot.data()
+    const planIds = memberData.planIds || []
+    
+    // Get the latest plan ID (last one in the array)
+    const latestPlanId = planIds[planIds.length - 1]
+    let latestPlan = null
+    
+    if (latestPlanId) {
+      const planRef = doc(db, 'plans', latestPlanId)
+      const planSnapshot = await getDoc(planRef)
+      if (planSnapshot.exists()) {
+        const planData = planSnapshot.data()
+        latestPlan = {
+          id: latestPlanId,
+          name: planData.name,
+          description: planData.description,
+          duration: planData.duration,
+          amount: planData.amount
+        }
+      }
+    }
+    
     return { 
       id: memberSnapshot.id, 
-      fullName: memberSnapshot.data().fullName,
-      address: memberSnapshot.data().address,
-      contactNumber: memberSnapshot.data().contactNumber,
-      email: memberSnapshot.data().email,
-      addmissionDate: memberSnapshot.data().addmissionDate.toDate(),
-      expiryDate: memberSnapshot.data().expiryDate.toDate(),
-      status: memberSnapshot.data().status,
-      seatNumber: memberSnapshot.data().seatNumber,
-      profileImage: memberSnapshot.data().profileImage,
-      document: memberSnapshot.data().document,
-      dueAmount: memberSnapshot.data().dueAmount,
-      totalAmount: memberSnapshot.data().totalAmount,
-      paidAmount: memberSnapshot.data().paidAmount,
-      discount: memberSnapshot.data().discount,
-      advanceAmount: memberSnapshot.data().advanceAmount,
-      planId: memberSnapshot.data().planId,
-      plan: memberSnapshot.data().plan,
-      createdAt: memberSnapshot.data().createdAt,
-      updatedAt: memberSnapshot.data().updatedAt
-     }
+      fullName: memberData.fullName,
+      address: memberData.address,
+      contactNumber: memberData.contactNumber,
+      email: memberData.email,
+      addmissionDate: memberData.addmissionDate.toDate(),
+      expiryDate: memberData.expiryDate.toDate(),
+      status: memberData.status,
+      seatNumber: memberData.seatNumber,
+      profileImage: memberData.profileImage,
+      document: memberData.document,
+      dueAmount: memberData.dueAmount,
+      totalAmount: memberData.totalAmount,
+      paidAmount: memberData.paidAmount,
+      discount: memberData.discount,
+      advanceAmount: memberData.advanceAmount,
+      planId: latestPlanId,
+      plan: latestPlan ? latestPlan.name : memberData.plan,
+      latestPlan: latestPlan,
+      createdAt: memberData.createdAt,
+      updatedAt: memberData.updatedAt
+    }
   } catch (error: any) {
     console.error("Unable to get member:", error.message)
     throw error
@@ -982,3 +895,101 @@ export   const deleteItem = async (id: string) => {
       console.error("Error deleting item:", error);
     }
   };
+
+export async function extendMemberPlan({
+  memberId,
+  newPlanId,
+  newPlan,
+  newExpiryDate,
+  additionalAmount,
+  discount,
+  paidAmount,
+  dueAmount
+}: {
+  memberId: string;
+  newPlanId: string;
+  newPlan: string;
+  newExpiryDate: Date;
+  additionalAmount: number;
+  discount: number;
+  paidAmount: number;
+  dueAmount: number;
+}) {
+  try {
+    // Get the current member data
+    const memberRef = doc(db, "members", memberId);
+    const memberDoc = await getDoc(memberRef);
+
+    if (!memberDoc.exists()) {
+      throw new Error("Member not found");
+    }
+
+    const memberData = memberDoc.data();
+    const currentPlanIds = memberData.planIds || [];
+
+    // Update the member document with new plan information
+    await updateDoc(memberRef, {
+      planIds: [...currentPlanIds, newPlanId], // Add new plan ID to the array
+      plan: newPlan,
+      expiryDate: newExpiryDate,
+      totalAmount: (Number(memberData.totalAmount) || 0) + additionalAmount,
+      paidAmount: (Number(memberData.paidAmount) || 0) + paidAmount,
+      dueAmount: (Number(memberData.dueAmount) || 0) + dueAmount,
+      discount: (Number(memberData.discount) || 0) + discount,
+      updatedAt: new Date(),
+    });
+
+    return {
+      success: true,
+      message: "Member plan extended successfully",
+      data: {
+        memberId,
+        newPlanId,
+        newExpiryDate,
+      },
+    };
+  } catch (error: any) {
+    console.error("Error extending member plan:", error.message);
+    throw error;
+  }
+}
+
+export async function getMemberPlanHistory({ memberId }: { memberId: string }) {
+  try {
+    const memberRef = doc(db, "members", memberId);
+    const memberDoc = await getDoc(memberRef);
+
+    if (!memberDoc.exists()) {
+      throw new Error("Member not found");
+    }
+
+    const memberData = memberDoc.data();
+    const planIds = memberData.planIds || [];
+
+    // Fetch all plans in the history
+    const plans = await Promise.all(
+      planIds.map(async (planId: string) => {
+        const planRef = doc(db, "plans", planId);
+        const planDoc = await getDoc(planRef);
+        
+        if (planDoc.exists()) {
+          const planData = planDoc.data();
+          return {
+            id: planId,
+            name: planData.name,
+            description: planData.description,
+            duration: planData.duration,
+            amount: planData.amount,
+            createdAt: planData.createdAt?.toDate() || new Date(),
+          };
+        }
+        return null;
+      })
+    );
+
+    return plans.filter(Boolean); // Remove any null values
+  } catch (error: any) {
+    console.error("Error fetching plan history:", error.message);
+    throw error;
+  }
+}

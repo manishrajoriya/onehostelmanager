@@ -51,6 +51,14 @@ interface InvoiceData {
   dueAmount: number;
   discount: number;
   advanceAmount: number;
+  planHistory: Array<{
+    id: string;
+    name: string;
+    description: string;
+    duration: string;
+    amount: string;
+    createdAt: Date;
+  }>;
 }
 
 export async function generateAndShareInvoice(data: InvoiceData) {
@@ -82,11 +90,29 @@ export async function generateAndShareInvoice(data: InvoiceData) {
           <p><strong>Email:</strong> ${data.email}</p>
         </div>
         <div class="plan-details">
-          <h2>Plan Details</h2>
+          <h2>Current Plan Details</h2>
           <p><strong>Plan:</strong> ${data.planName}</p>
           <p><strong>Admission Date:</strong> ${data.admissionDate}</p>
           <p><strong>Expiry Date:</strong> ${data.expiryDate}</p>
-          <p><strong>Advance Amount:</strong> ${data.advanceAmount}</p>
+        </div>
+        <div class="plan-history">
+          <h2>Plan History</h2>
+          <table>
+            <tr>
+              <th>Plan Name</th>
+              <th>Duration</th>
+              <th>Amount</th>
+              <th>Start Date</th>
+            </tr>
+            ${data.planHistory.map(plan => `
+              <tr>
+                <td>${plan.name}</td>
+                <td>${plan.duration}</td>
+                <td>₹${plan.amount}</td>
+                <td>${plan.createdAt.toLocaleDateString()}</td>
+              </tr>
+            `).join('')}
+          </table>
         </div>
         <table>
           <tr>
@@ -102,6 +128,10 @@ export async function generateAndShareInvoice(data: InvoiceData) {
             <td>₹${data.paidAmount}</td>
           </tr>
           <tr>
+            <td>Advance Amount</td>
+            <td>₹${data.advanceAmount}</td>
+          </tr>
+          <tr>
             <td><strong>Discount</strong></td>
             <td><strong>₹${data.discount}</strong></td>
           </tr>
@@ -109,7 +139,6 @@ export async function generateAndShareInvoice(data: InvoiceData) {
             <td><strong>Due Amount</strong></td>
             <td><strong>₹${data.dueAmount}</strong></td>
           </tr>
-         
         </table>
         <div style="margin-top: 40px; text-align: center;">
           <p>Thank you for your business! Visit again One Hostel Manager App</p>

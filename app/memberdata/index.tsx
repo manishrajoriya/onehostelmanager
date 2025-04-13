@@ -11,13 +11,19 @@ import {
   Modal,
   Alert,
   Linking,
+  TextInput,
+  
+  Platform,
 } from "react-native"
+import { Picker } from "@react-native-picker/picker";
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { AntDesign, MaterialIcons } from "@expo/vector-icons"
-import { getMemberById, fetchSeatByMemberId, fetchAttendanceByMemberId, deleteMember } from "@/firebase/functions"
+import { getMemberById, fetchSeatByMemberId, fetchAttendanceByMemberId, deleteMember, getMemberPlanHistory, extendMemberPlan, getPlans } from "@/firebase/functions"
 import Toast from "react-native-toast-message"
 import WhatsAppModal from "@/component/member/WhatsappMessage"
 import { generateAndShareInvoice } from "@/firebase/helper"
+import DateTimePicker from "@react-native-community/datetimepicker"
+import useStore from "@/hooks/store"
 
 
 interface MemberDetails {
@@ -62,6 +68,23 @@ interface Seat {
   memberExpiryDate: Date
 }
 
+interface PlanHistory {
+  id: string;
+  name: string;
+  description: string;
+  duration: string;
+  amount: string;
+  createdAt: Date;
+}
+
+interface Plan {
+  id: string;
+  name: string;
+  description: string;
+  duration: string;
+  amount: string;
+}
+
 const DetailRow: React.FC<DetailRowProps> = ({ label, value, icon }) => (
   <View style={styles.detailRow}>
     {icon && <View style={styles.detailIcon}>{icon}</View>}
@@ -85,8 +108,19 @@ const MemberDetails: React.FC = () => {
   const [imageLoadError, setImageLoadError] = useState(false)
   const [isWhatsAppModalVisible, setIsWhatsAppModalVisible] = useState(false)
   const [messageTemplates, setMessageTemplates] = useState<string[]>([])
-  //    const currentUser = useStore((state: any) => state.currentUser);
-  //  console.log("currentUser", currentUser);
+  const [planHistory, setPlanHistory] = useState<PlanHistory[]>([])
+  const [showPlanHistory, setShowPlanHistory] = useState(false)
+  const [showPlanPicker, setShowPlanPicker] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<string>("")
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("")
+  const [newExpiryDate, setNewExpiryDate] = useState<Date>(new Date())
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [isExtending, setIsExtending] = useState(false)
+  const currentUser = useStore((state: any) => state.currentUser)
+  const activeLibrary = useStore((state: any) => state.activeLibrary)
+  const [discount, setDiscount] = useState<string>("0")
+  const [paidAmount, setPaidAmount] = useState<string>("0")
 
   const fetchMemberData = async () => {
     try {
@@ -99,6 +133,9 @@ const MemberDetails: React.FC = () => {
 
         const fetchedSeat = await fetchSeatByMemberId(memberId)
         setSeat(fetchedSeat[0])
+
+        const fetchedPlanHistory = await getMemberPlanHistory({ memberId })
+        setPlanHistory(fetchedPlanHistory)
       }
     } catch (error) {
       console.error("Error fetching member data:", error)
@@ -110,6 +147,18 @@ const MemberDetails: React.FC = () => {
   useEffect(() => {
     fetchMemberData()
   }, [memberId])
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const fetchedPlans = await getPlans({ currentUser, libraryId: activeLibrary.id })
+        setPlans(fetchedPlans)
+      } catch (error) {
+        console.error("Error fetching plans:", error)
+      }
+    }
+    fetchPlans()
+  }, [currentUser, activeLibrary.id])
 
   const handleMemberDelete = async () => {
     try {
@@ -182,7 +231,14 @@ const MemberDetails: React.FC = () => {
         dueAmount: member.dueAmount,
         discount: member.discount,
         advanceAmount: member.advanceAmount,
-        
+        planHistory: planHistory.map(plan => ({
+          id: plan.id,
+          name: plan.name,
+          description: plan.description,
+          duration: plan.duration,
+          amount: plan.amount,
+          createdAt: plan.createdAt
+        }))
       })
     } catch (error) {
       console.error("Error handling invoice print:", error)
@@ -191,6 +247,59 @@ const MemberDetails: React.FC = () => {
         text1: "Failed to generate invoice",
         text2: "Please try again later",
       })
+    }
+  }
+
+  const handleExtendPlan = async () => {
+    if (!selectedPlan || !selectedPlanId) {
+      Toast.show({
+        type: "error",
+        text1: "Please select a plan",
+      })
+      return
+    }
+
+    try {
+      setIsExtending(true)
+      const selectedPlanData = plans.find(plan => plan.id === selectedPlanId)
+      const planAmount = Number(selectedPlanData?.amount || "0")
+      const discountAmount = Number(discount || "0")
+      const paidAmountValue = Number(paidAmount || "0")
+      const totalAmount = planAmount - discountAmount
+      const dueAmount = totalAmount - paidAmountValue
+      
+      await extendMemberPlan({
+        memberId: member?.id!,
+        newPlanId: selectedPlanId,
+        newPlan: selectedPlan,
+        newExpiryDate,
+        additionalAmount: totalAmount,
+        discount: discountAmount,
+        paidAmount: paidAmountValue,
+        dueAmount: dueAmount
+      })
+
+      Toast.show({
+        type: "success",
+        text1: "Plan extended successfully",
+      })
+
+      // Refresh member data
+      await fetchMemberData()
+      
+      // Reset form
+      setSelectedPlan("")
+      setSelectedPlanId("")
+      setNewExpiryDate(new Date())
+      setDiscount("0")
+      setPaidAmount("0")
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: error.message || "Failed to extend plan",
+      })
+    } finally {
+      setIsExtending(false)
     }
   }
 
@@ -297,6 +406,38 @@ const MemberDetails: React.FC = () => {
         )}
       </View>
 
+      {/* Plan History Section */}
+      <TouchableOpacity style={styles.card} onPress={() => setShowPlanHistory(!showPlanHistory)}>
+        <View style={styles.reportHeader}>
+          <Text style={styles.reportTitle}>Plan History</Text>
+          <AntDesign name={showPlanHistory ? "up" : "down"} size={20} color="#02c39a" />
+        </View>
+        {showPlanHistory && (
+          <View style={styles.planHistoryContainer}>
+            {planHistory.length > 0 ? (
+              planHistory.map((plan, index) => (
+                <View key={`${plan.id}-${plan.createdAt.getTime()}`} style={styles.planHistoryItem}>
+                  <View style={styles.planHistoryHeader}>
+                    <Text style={styles.planHistoryName}>{plan.name}</Text>
+                    <Text style={styles.planHistoryDate}>
+                      {plan.createdAt.toLocaleDateString()}
+                    </Text>
+                  </View>
+                  <Text style={styles.planHistoryDescription}>{plan.description}</Text>
+                  <View style={styles.planHistoryDetails}>
+                    <Text style={styles.planHistoryDetail}>Duration: {plan.duration}</Text>
+                    <Text style={styles.planHistoryDetail}>Amount: ₹{plan.amount}</Text>
+                  </View>
+                  {index < planHistory.length - 1 && <View style={styles.planHistoryDivider} />}
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noDataText}>No plan history available</Text>
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
+
       {/* Action Buttons */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.addOnPlanButton} onPress={handleMemberDelete}>
@@ -309,7 +450,10 @@ const MemberDetails: React.FC = () => {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.gymPlanButton} onPress={handleMemberUpdate}>
-          <Text style={styles.gymPlanButtonText}>Update/Add Plan</Text>
+          <Text style={styles.gymPlanButtonText}>Update Member</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.gymPlanButton} onPress={() => setShowPlanPicker(true)}>
+          <Text style={styles.gymPlanButtonText}>Extend Plan</Text>
         </TouchableOpacity>
         </View>
 
@@ -403,6 +547,138 @@ const MemberDetails: React.FC = () => {
         onSend={handleSendWhatsAppMessage}
         contactNumber={member?.contactNumber || ""}
       />
+      <Modal
+        visible={showPlanPicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPlanPicker(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Extend Plan</Text>
+            
+            {/* Plan Selection */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Select Plan</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={selectedPlan}
+                  onValueChange={(itemValue: string, itemIndex: number) => {
+                    setSelectedPlan(itemValue)
+                    setSelectedPlanId(plans[itemIndex - 1]?.id || "")
+                  }}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="Select Plan" value="" />
+                  {plans.map((plan) => (
+                    <Picker.Item key={plan.id} label={plan.name} value={plan.name} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+
+            {/* Amount Section */}
+            <View style={styles.amountSection}>
+              <View style={styles.amountRow}>
+                <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
+                  <Text style={styles.amountLabel}>Plan Amount</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="0.00"
+                    keyboardType="numeric"
+                    editable={false}
+                    value={selectedPlanId ? plans.find(p => p.id === selectedPlanId)?.amount || "0" : "0"}
+                  />
+                </View>
+
+                <View style={[styles.inputGroup, styles.flex1]}>
+                  <Text style={styles.amountLabel}>Discount</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="00"
+                    keyboardType="numeric"
+                    value={discount}
+                    onChangeText={(value) => setDiscount(value)}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.amountRow}>
+                <View style={[styles.inputGroup, styles.flex1]}>
+                  <Text style={styles.amountLabel}>Paid Amount</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="00"
+                    keyboardType="numeric"
+                    value={paidAmount}
+                    onChangeText={(value) => setPaidAmount(value)}
+                  />
+                </View>
+
+                <View style={[styles.inputGroup, styles.flex1]}>
+                  <Text style={[styles.amountLabel, styles.dueAmount]}>Due Amount</Text>
+                  <TextInput
+                    style={[styles.amountInput, styles.dueAmount]}
+                    placeholder="00"
+                    keyboardType="numeric"
+                    editable={false}
+                    value={(
+                      Number(selectedPlanId ? plans.find(p => p.id === selectedPlanId)?.amount || "0" : "0") -
+                      Number(discount || "0") -
+                      Number(paidAmount || "0")
+                    ).toString()}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Expiry Date Selection */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>New Expiry Date</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text>{newExpiryDate.toLocaleDateString()}</Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={newExpiryDate}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(false)
+                    if (selectedDate) {
+                      setNewExpiryDate(selectedDate)
+                    }
+                  }}
+                />
+              )}
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowPlanPicker(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleExtendPlan}
+                disabled={isExtending}
+              >
+                {isExtending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Extend Plan</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <Toast />
     </ScrollView>
   )
@@ -630,9 +906,68 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    width: "90%",
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 20,
+    textAlign: "center",
+    color: "#333",
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+  },
+  picker: {
+    height: 50,
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: "#fff",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: "#f3f4f6",
+  },
+  confirmButton: {
+    backgroundColor: "#02c39a",
+  },
+  cancelButtonText: {
+    color: "#666",
+    fontSize: 16,
+  },
+  confirmButtonText: {
+    color: "#fff",
+    fontSize: 16,
   },
   fullSizeImage: {
     width: "100%",
@@ -648,6 +983,76 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 16,
     textAlign: "center",
+  },
+  planHistoryContainer: {
+    marginTop: 10,
+  },
+  planHistoryItem: {
+    paddingVertical: 12,
+  },
+  planHistoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  planHistoryName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  planHistoryDate: {
+    fontSize: 14,
+    color: '#666',
+  },
+  planHistoryDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  planHistoryDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  planHistoryDetail: {
+    fontSize: 14,
+    color: '#666',
+  },
+  planHistoryDivider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginVertical: 12,
+  },
+  amountSection: {
+    backgroundColor: "#f3f4f6",
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+  },
+  amountRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  amountLabel: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#4b5563",
+    marginBottom: 4,
+  },
+  amountInput: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 6,
+    padding: 8,
+    fontSize: 16,
+  },
+  marginRight: {
+    marginRight: 10,
+  },
+  flex1: {
+    flex: 1,
   },
 })
 
