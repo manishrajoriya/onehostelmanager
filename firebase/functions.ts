@@ -721,9 +721,11 @@ export const allotSeat = async (seatId: string, memberId: string, memberName: st
         expiryDate
       }
     };
-  } catch (error) {
-    console.error("Error allocating seat:", error);
-    throw error;
+  } catch (error: any) {
+    return {
+      success: false,
+      message: error.message
+    }
   }
 }
 
