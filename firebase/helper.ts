@@ -7,14 +7,16 @@ import { SeatData } from "@/types/MemberProfile";
 
 import { shareAsync } from "expo-sharing"
 import * as Print from "expo-print"
+import useStore from "@/hooks/store";
 
 
 // Upload image to Firebase Storage
 export const uploadImageToFirebase = async (uri: string): Promise<string> => {
+  const currentUser = useStore((state: any) => state.currentUser);
   const response = await fetch(uri);
   const blob = await response.blob();
   const filename = uri.substring(uri.lastIndexOf("/") + 1);
-  const storageRef = ref(storage, `uploads/${filename}`);
+  const storageRef = ref(storage, `uploads/${currentUser.uid}/${filename}`);
 
   try {
     const snapshot = await uploadBytes(storageRef, blob);

@@ -35,14 +35,13 @@ export const pickImage = async (source: "camera" | "gallery") => {
     result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
+      quality: 0.3,
     });
   } else {
     result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      quality: 1,
+      quality: 0.3,
     });
   }
 
@@ -53,11 +52,11 @@ export const pickImage = async (source: "camera" | "gallery") => {
   return null;
 };
 
-export const uploadImageToFirebase = async (uri: string): Promise<string> => {
+export const uploadImageToFirebase = async (currentUser: any, uri: string): Promise<string> => {
   const response = await fetch(uri);
   const blob = await response.blob();
   const filename = uri.substring(uri.lastIndexOf("/") + 1);
-  const storageRef = ref(storage, `uploads/${filename}`);
+  const storageRef = ref(storage, `upload/${currentUser.uid}/${filename}`);
 
   try {
     const snapshot = await uploadBytes(storageRef, blob);

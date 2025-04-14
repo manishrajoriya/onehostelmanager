@@ -1,13 +1,22 @@
 // src/services/subscriptionService.ts
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import Purchases, { CustomerInfo } from 'react-native-purchases';
 import PurchasesPaywallUI from 'react-native-purchases-ui';
 
 // Initialize RevenueCat (call this once when your app starts)
 export const initializeRevenueCat = async () => {
   try {
+    const androidApiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID;
+    const iosApiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS;
+    
+    if (!androidApiKey || !iosApiKey) {
+      throw new Error('RevenueCat API keys are not properly configured');
+    }
+    
+    const apiKey = Platform.OS === 'ios' ? iosApiKey : androidApiKey;
+    
     await Purchases.configure({
-      apiKey: Platform.OS === 'ios' ? 'goog_EQvMUrloQOmLvAIEwATtGisaogK' : 'goog_EQvMUrloQOmLvAIEwATtGisaogK'
+      apiKey: apiKey
     });
   } catch (error) {
     console.error('Error initializing RevenueCat:', error);

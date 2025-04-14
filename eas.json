@@ -11,7 +11,18 @@
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDg-zuRagYu1liAb51VyvpnKRo2-HduNM4",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "one-hostel.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "one-hostel",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "one-hostel.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "217645962699",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:217645962699:web:ddc0a944eb5c4258bc524e",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-XVYGEQYVBR",
+        "EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID": "goog_EQvMUrloQOmLvAIEwATtGisaogK",
+        "EXPO_PUBLIC_REVENUECAT_API_KEY_IOS": "appl_EQvMUrloQOmLvAIEwATtGisaogK"
+      }
     },
     "production": {
       "autoIncrement": true,
@@ -23,7 +34,9 @@
         "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "one-hostel.firebasestorage.app",
         "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "217645962699",
         "EXPO_PUBLIC_FIREBASE_APP_ID": "1:217645962699:web:ddc0a944eb5c4258bc524e",
-        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-XVYGEQYVBR"
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-XVYGEQYVBR",
+        "EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID": "goog_EQvMUrloQOmLvAIEwATtGisaogK",
+        "EXPO_PUBLIC_REVENUECAT_API_KEY_IOS": "appl_EQvMUrloQOmLvAIEwATtGisaogK"
       }
     }
   },

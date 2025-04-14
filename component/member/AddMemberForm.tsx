@@ -121,7 +121,7 @@ export default function AddMemberForm() {
       const uri = await pickImage(source)
       if (uri) {
         setIsLoading(true)
-        const uploadedUrl = await uploadImageToFirebase(uri)
+        const uploadedUrl = await uploadImageToFirebase(currentUser, uri)
         setValue(field, uploadedUrl)
       }
     } catch (error) {
