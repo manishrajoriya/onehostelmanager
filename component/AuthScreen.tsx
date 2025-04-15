@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, type AuthEr
 import { auth } from "@/utils/firebaseConfig";
 import { useRouter } from "expo-router";
 import useStore from "@/hooks/store";
+import Purchases from 'react-native-purchases';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -39,17 +40,36 @@ export default function LoginScreen() {
     return true;
   };
 
+    // New: Link RevenueCat to Firebase UID
+  const linkRevenueCatUser = async (firebaseUid: string) => {
+    try {
+      await Purchases.logIn(firebaseUid); // 🔑 Critical for cross-device sync
+      console.log("RevenueCat linked to Firebase UID:", firebaseUid);
+    } catch (error) {
+      console.error("RevenueCat login failed:", error);
+    }
+  };
+
   const handleAuth = async (): Promise<void> => {
     if (!validateForm()) return;
     setLoading(true);
     try {
+      let userCredential;
+      
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+       userCredential = await signInWithEmailAndPassword(auth, email, password);
+       console.log("User logged in:", userCredential);
+       
         Alert.alert("Success", "Logged in successfully");
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
         Alert.alert("Success", "Account created successfully");
       }
+
+      if (userCredential.user?.uid) {
+        await linkRevenueCatUser(userCredential.user.uid);
+      }
+
       router.replace("/(tabs)");
     } catch (error) {
       const authError = error as AuthError;
