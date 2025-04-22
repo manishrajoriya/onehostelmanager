@@ -130,10 +130,10 @@ const CustomDrawerContent = (props: any) => {
         />
 
         {/* Finance Section */}
-        <Text style={styles.sectionTitle}>Finance</Text>
+        <Text style={styles.sectionTitle}>Subscription</Text>
         <DrawerItem
-          label="Finance"
-          icon="cash"
+          label="Subscription"
+          icon="wallet"
           onPress={() => props.navigation.navigate("Finance")}
           isActive={activeRoute === "Finance"}
         />

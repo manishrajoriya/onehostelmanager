@@ -5,7 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert
+  Alert,
+  Linking,
+  ScrollView
 } from 'react-native';
 import Purchases, { 
   PurchasesError, 
@@ -117,6 +119,14 @@ const SubscriptionScreen: React.FC = () => {
     }
   };
 
+  const handleOpenPolicy = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      Alert.alert('Error', 'Could not open the link');
+    }
+  };
+
   const renderCurrentSubscription = (): React.ReactNode => {
     return (
       <View style={styles.currentSubscriptionContainer}>
@@ -142,6 +152,54 @@ const SubscriptionScreen: React.FC = () => {
     );
   };
 
+  const renderPolicySection = () => {
+    return (
+      <View style={styles.policyButtonsContainer}>
+        <Text style={styles.policySectionTitle}>Policies & Information</Text>
+        
+        <View style={styles.policyContent}>
+          <Text style={styles.policyTitle}>Terms of Service</Text>
+          <Text style={styles.policyText}>
+            By using this application, you agree to these terms. The app is provided "as is" without any warranties. 
+            We reserve the right to modify these terms at any time. Your continued use of the app constitutes acceptance of any changes.
+          </Text>
+
+          <Text style={styles.policyTitle}>Privacy Policy</Text>
+          <Text style={styles.policyText}>
+            We collect and process your data in accordance with applicable laws. We use your information to provide and improve our services. 
+            We do not sell your personal information to third parties. You can request deletion of your data at any time.
+          </Text>
+
+          <Text style={styles.policyTitle}>Subscription Terms</Text>
+          <Text style={styles.policyText}>
+            • Subscriptions are billed on a recurring basis
+            {'\n'}• You can choose between monthly and annual subscription plans
+            {'\n'}• All subscription plans include access to all premium features
+            {'\n'}• Subscription prices are subject to change with notice
+          </Text>
+
+         
+          <Text style={styles.policyTitle}>Cancellation Policy</Text>
+          <Text style={styles.policyText}>
+            • You can cancel your subscription anytime through Google Play
+            {'\n'}• Cancellation takes effect at the end of the current billing period
+            {'\n'}• You will continue to have access to premium features until the end of your current period
+            {'\n'}• No partial refunds for cancelled subscriptions
+          </Text>
+
+          <Text style={styles.policyTitle}>Refund Policy</Text>
+          <Text style={styles.policyText}>
+            • Refunds are subject to Google Play's refund policy
+            {'\n'}• Refund requests must be made within 48 hours of purchase
+            {'\n'}• Contact Onelibrary01@gmail.com for refund requests
+          </Text>
+
+        
+        </View>
+      </View>
+    );
+  };
+
   if (state.loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -153,55 +211,66 @@ const SubscriptionScreen: React.FC = () => {
 
   const premiumFeatures: string[] = [
     "Access to all content",
-    "Unlimited downloads",
-    "Ad-free experience",
-    "Early access to new features",
+    "Add Unlimited Members",
+    "Add 20+ Hostels",
+    "Always Access to stored data",
     "Priority customer support"
   ];
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.contentContainer}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>Premium Access</Text>
-          <Text style={styles.headerSubtitle}>Unlock all features with a subscription</Text>
-        </View>
-
-        {state.isSubscribed ? (
-          renderCurrentSubscription()
-        ) : (
-          <View style={styles.subscribeContainer}>
-            <View style={styles.featuresContainer}>
-              <Text style={styles.featuresTitle}>Premium Features</Text>
-              {premiumFeatures.map(renderFeatureItem)}
-            </View>
-
-            <TouchableOpacity
-              style={styles.purchaseButton}
-              onPress={handleShowPaywall}
-            >
-              <Text style={styles.purchaseButtonText}>View Subscription Options</Text>
-            </TouchableOpacity>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.contentContainer}>
+          <View style={styles.headerContainer}>
+            <Text style={styles.headerTitle}>Premium Access</Text>
+            <Text style={styles.headerSubtitle}>Unlock all features with a subscription</Text>
           </View>
-        )}
 
-        <TouchableOpacity
-          style={styles.restoreButton}
-          onPress={handleRestorePurchases}
-          disabled={state.isRestoring}
-        >
-          {state.isRestoring ? (
-            <ActivityIndicator size="small" color="#666" />
+          {state.isSubscribed ? (
+            renderCurrentSubscription()
           ) : (
-            <Text style={styles.restoreButtonText}>Restore Purchases</Text>
-          )}
-        </TouchableOpacity>
+            <View style={styles.subscribeContainer}>
+              <View style={styles.featuresContainer}>
+                <Text style={styles.featuresTitle}>Premium Features</Text>
+                {premiumFeatures.map(renderFeatureItem)}
+              </View>
 
-        <Text style={styles.termsText}>
-          By subscribing, you agree to our Terms of Service and Privacy Policy.
-          Subscriptions will automatically renew unless canceled at least 24 hours before the end of the current period.
-        </Text>
-      </View>
+              <TouchableOpacity
+                style={styles.purchaseButton}
+                onPress={handleShowPaywall}
+              >
+                <Text style={styles.purchaseButtonText}>View Subscription Options</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={handleRestorePurchases}
+            disabled={state.isRestoring}
+          >
+            {state.isRestoring ? (
+              <ActivityIndicator size="small" color="#666" />
+            ) : (
+              <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.policiesContainer}>
+            <Text style={styles.termsText}>
+              By subscribing, you agree to our Terms of Service and Privacy Policy.
+            </Text>
+            <Text style={styles.subscriptionTerms}>
+              • You can manage your subscription in your Google Play account settings
+              {'\n'}• Payment will be charged to your Google Play account at confirmation of purchase
+              {'\n'}• You can cancel your subscription anytime through your Google Play account settings
+              {'\n'}• Refunds are subject to Google Play's refund policy
+            </Text>
+          </View>
+
+          {renderPolicySection()}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -334,6 +403,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  policyButtonsContainer: {
+    marginTop: 20,
+    marginBottom: 30,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  policySectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  policyContent: {
+    padding: 10,
+  },
+  policyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  policyText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  policiesContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  subscriptionTerms: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 10,
+    lineHeight: 18,
   },
 });
 
