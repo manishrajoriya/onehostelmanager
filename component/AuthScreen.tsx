@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, type AuthError } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, type AuthError, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/utils/firebaseConfig";
 import { useRouter } from "expo-router";
 import useStore from "@/hooks/store";
@@ -44,7 +44,7 @@ export default function LoginScreen() {
   const linkRevenueCatUser = async (firebaseUid: string) => {
     try {
       await Purchases.logIn(firebaseUid); // 🔑 Critical for cross-device sync
-      console.log("RevenueCat linked to Firebase UID:", firebaseUid);
+      
     } catch (error) {
       console.error("RevenueCat login failed:", error);
     }
@@ -58,7 +58,7 @@ export default function LoginScreen() {
       
       if (isLogin) {
        userCredential = await signInWithEmailAndPassword(auth, email, password);
-       console.log("User logged in:", userCredential);
+       
        
         Alert.alert("Success", "Logged in successfully");
       } else {
@@ -76,6 +76,25 @@ export default function LoginScreen() {
       Alert.alert("Error", isLogin ? "Login failed: " : "Signup failed: " + authError.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert("Error", "Please enter your email address");
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      Alert.alert("Success", "Password reset email sent. Please check your inbox.");
+    } catch (error) {
+      const authError = error as AuthError;
+      Alert.alert("Error", "Failed to send reset email: " + authError.message);
     }
   };
 
@@ -102,6 +121,11 @@ export default function LoginScreen() {
           secureTextEntry
           autoComplete="password"
         />
+        {isLogin && (
+          <TouchableOpacity onPress={handleForgotPassword}>
+            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity 
           style={[styles.button, loading && styles.buttonDisabled]} 
           onPress={handleAuth} 
@@ -123,61 +147,78 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#f0f2f5",
+    backgroundColor: "#f8f9fa",
   },
   card: {
     width: "100%",
     maxWidth: 400,
     backgroundColor: "white",
-    padding: 20,
-    borderRadius: 10,
+    padding: 30,
+    borderRadius: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 5,
   },
   title: {
-    fontSize: 26,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: "700",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 30,
+    color: "#1a1a1a",
   },
   label: {
-    fontSize: 14,
-    fontWeight: "bold",
-    marginBottom: 5,
-    color: "#333",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 8,
+    color: "#2d2d2d",
   },
   input: {
     width: "100%",
-    height: 45,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    marginBottom: 15,
-    paddingHorizontal: 10,
-    borderRadius: 5,
+    height: 50,
+    borderColor: "#e0e0e0",
+    borderWidth: 1.5,
+    marginBottom: 20,
+    paddingHorizontal: 15,
+    borderRadius: 12,
     backgroundColor: "#fff",
+    fontSize: 15,
+    color: "#333",
   },
   button: {
-    backgroundColor: "#007AFF",
-    padding: 12,
-    borderRadius: 5,
+    backgroundColor: "#02c39a",
+    padding: 15,
+    borderRadius: 12,
     alignItems: "center",
     marginTop: 10,
+    shadowColor: "#02c39a",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   buttonDisabled: {
     backgroundColor: "#a0c4ff",
+    shadowOpacity: 0,
   },
   buttonText: {
     color: "white",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
   switchText: {
-    marginTop: 15,
-    color: "#007AFF",
+    marginTop: 20,
+    color: "#02c39a",
     textAlign: "center",
-    fontWeight: "bold",
+    fontWeight: "600",
+    fontSize: 15,
+  },
+  forgotPasswordText: {
+    color: "#02c39a",
+    textAlign: "right",
+    marginBottom: 20,
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

@@ -75,7 +75,7 @@ export default function AddMemberForm() {
 
   const onSubmit = async (data: FormData) => {
      
-     if (memberCount >= 2 && !isSubscribed) {
+     if (memberCount >= 5 && !isSubscribed) {
       setShowPaywall(true);
       return;
     }

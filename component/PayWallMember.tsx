@@ -32,13 +32,13 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
       <View style={styles.container}>
         <Text style={styles.title}>Upgrade Required</Text>
         <Text style={styles.text}>
-          You've reached the limit of 2 members. Upgrade to premium to add unlimited members.
+          You've reached the limit of 5 members. Upgrade to premium to add unlimited members.
         </Text>
         
         <View style={styles.features}>
-          <Text style={styles.featureItem}>✓ Unlimited members</Text>
-          <Text style={styles.featureItem}>✓ Priority support</Text>
-          <Text style={styles.featureItem}>✓ Advanced analytics</Text>
+          <Text style={styles.featureItem}>✓ Add Unlimited members</Text>
+          <Text style={styles.featureItem}>✓ Add 20+ Hostels</Text>
+          <Text style={styles.featureItem}>✓ Add Unlimited Data</Text>
         </View>
         
         <TouchableOpacity 

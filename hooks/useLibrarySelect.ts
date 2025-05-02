@@ -32,9 +32,9 @@ export function useLibrarySelection() {
       } else {
         if (currentUser && libraries.length === 0) {
           const newLibrary = {
-            name: "Default Library",
+            name: "First Hostel",
             address: "N/A",
-            description: "Automatically created library",
+            description: "Edit this hostel to add your own hostel details",
           };
           await addLibrary({ data: newLibrary, currentUser });
           const updatedLibraries = await getLibraries({ currentUser });
