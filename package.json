@@ -1,7 +1,7 @@
 {
   "name": "onehostelmanager",
   "main": "expo-router/entry",
-  "version": "1.0.5",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "start": "expo start",

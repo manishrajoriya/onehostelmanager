@@ -13,7 +13,7 @@ import {
   Modal,
 } from "react-native";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
-import { fetchSeats, allotSeat, deallocateSeat } from "@/firebase/functions";
+import { fetchSeats, allotSeat, deallocateSeat, deleteSeat } from "@/firebase/functions";
 import { getMembers } from "@/firebase/functions";
 import useStore from "@/hooks/store";
 
@@ -216,6 +216,39 @@ const AllocateSeatsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteSeat = async (seatId: string) => {
+    Alert.alert(
+      "Delete Seat",
+      "Are you sure you want to delete this seat? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const result = await deleteSeat(seatId);
+              if (result.success) {
+                Alert.alert("Success", result.message);
+                await loadData();
+              } else {
+                Alert.alert("Error", result.message);
+              }
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete seat");
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderSeat = ({ item }: { item: Seat }) => (
     <TouchableOpacity
       style={[
@@ -249,6 +282,12 @@ const AllocateSeatsPage: React.FC = () => {
           <Text style={styles.availableText}>Available</Text>
         )}
       </View>
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => handleDeleteSeat(item.id)}
+      >
+        <MaterialIcons name="delete" size={24} color="#ff4444" />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -666,6 +705,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginBottom: 4,
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8,
   },
 });
 

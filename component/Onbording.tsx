@@ -1,17 +1,11 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image } from "react-native";
+import React, { useEffect } from "react";
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSpring,
-  withDelay,
   Easing,
-  interpolate,
-  useAnimatedScrollHandler,
-  runOnJS,
-  withSequence,
 } from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,186 +14,119 @@ import { LinearGradient } from "expo-linear-gradient";
 const { width, height } = Dimensions.get("window");
 
 interface OnboardingItem {
-  id: number;
   title: string;
   description: string;
-  image: any;
-  backgroundColor: readonly [string, string, ...string[]];
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  backgroundColor: readonly [string, string, ...string[]]; // Enforce at least two colors
   textColor: string;
 }
 
-const onboardingData: OnboardingItem[] = [
-  {
-    id: 1,
-    title: "Welcome to One Hostel",
-    description: "Your all-in-one solution for hostel management",
-    image: require("../assets/images/home.png"),
-    backgroundColor: ["#4A90E2", "#357ABD"] as const,
-    textColor: "#fff",
-  },
-  {
-    id: 2,
-    title: "Smart Room Management",
-    description: "Easily manage room allocations, check-ins, and check-outs",
-    image: require("../assets/images/home.png"),
-    backgroundColor: ["#2ECC71", "#27AE60"] as const,
-    textColor: "#fff",
-  },
-  {
-    id: 3,
-    title: "Track Everything",
-    description: "Monitor expenses, maintenance, and student records in one place",
-    image: require("../assets/images/home.png"),
-    backgroundColor: ["#E74C3C", "#C0392B"] as const,
-    textColor: "#fff",
-  },
-];
+const onboardingData: OnboardingItem = {
+  title: "Welcome to One Hostel",
+  description: "Your personal hostel management assistant",
+  icon: "home-outline",
+  backgroundColor: ["#7F53AC", "#647DEE", "#43C6AC"] as const, // Updated gradient
+  textColor: "#fff",
+};
 
-const OnboardingSlide = ({ item, index, scrollX }: { item: OnboardingItem; index: number; scrollX: Animated.SharedValue<number> }) => {
-  const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
+const OnboardingSlide = ({ item }: { item: OnboardingItem }) => {
+  const titleOpacity = useSharedValue(0);
+  const descriptionOpacity = useSharedValue(0);
+  const iconOpacity = useSharedValue(0);
+  const taglineOpacity = useSharedValue(0);
 
-  const imageStyle = useAnimatedStyle(() => {
-    const scale = interpolate(
-      scrollX.value,
-      inputRange,
-      [0.8, 1, 0.8],
-      'clamp'
-    );
-    return {
-      transform: [{ scale: withSpring(scale, { damping: 20, stiffness: 90 }) }],
-    };
-  });
+  const titleStyle = useAnimatedStyle(() => ({
+    opacity: titleOpacity.value,
+    transform: [{ translateY: withTiming(titleOpacity.value ? 0 : 40, { duration: 800 }) }],
+  }));
 
-  const textStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      scrollX.value,
-      inputRange,
-      [0, 1, 0],
-      'clamp'
-    );
-    return {
-      opacity: withTiming(opacity, { duration: 300 }),
-    };
-  });
+  const descStyle = useAnimatedStyle(() => ({
+    opacity: descriptionOpacity.value,
+    transform: [{ translateY: withTiming(descriptionOpacity.value ? 0 : 40, { duration: 800 }) }],
+  }));
+
+  const iconStyle = useAnimatedStyle(() => ({
+    opacity: iconOpacity.value,
+    transform: [{ scale: withTiming(iconOpacity.value ? 1 : 0.7, { duration: 900 }) }],
+  }));
+
+  const taglineStyle = useAnimatedStyle(() => ({
+    opacity: taglineOpacity.value,
+    transform: [{ translateY: withTiming(taglineOpacity.value ? 0 : 20, { duration: 700 }) }],
+  }));
+
+  useEffect(() => {
+    iconOpacity.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.exp) });
+    titleOpacity.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.exp) });
+    taglineOpacity.value = withTiming(1, { duration: 1100, easing: Easing.out(Easing.exp) });
+    descriptionOpacity.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.exp) });
+  }, []);
 
   return (
     <LinearGradient colors={item.backgroundColor} style={styles.slide}>
-      <Animated.View style={[styles.imageContainer, imageStyle]}>
-        <Image source={item.image} style={styles.image} />
+      <Animated.View style={[styles.iconCircle, iconStyle]}>
+        <Ionicons name={item.icon} size={70} color={item.textColor} />
       </Animated.View>
-
-      <Animated.Text style={[styles.title, { color: item.textColor }, textStyle]}>
-        {item.title}
-      </Animated.Text>
-
-      <Animated.Text style={[styles.description, { color: item.textColor }, textStyle]}>
-        {item.description}
-      </Animated.Text>
+      <Animated.View style={[styles.textContainer, titleStyle]}>
+        <Text style={[styles.title, { color: item.textColor }]}> {item.title} </Text>
+      </Animated.View>
+      <Animated.View style={[styles.taglineContainer, taglineStyle]}>
+        <Text style={styles.tagline}>Manage student, fees, seat, and more</Text>
+      </Animated.View>
+      <Animated.View style={[styles.textContainer, descStyle]}>
+        <Text style={[styles.description, { color: item.textColor }]}>{item.description}</Text>
+      </Animated.View>
     </LinearGradient>
   );
 };
 
-const Pagination = ({ data, scrollX }: { data: OnboardingItem[]; scrollX: Animated.SharedValue<number> }) => {
-  return (
-    <View style={styles.paginationContainer}>
-      {data.map((_, index) => {
-        const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
-        
-        const dotStyle = useAnimatedStyle(() => {
-          const width = interpolate(
-            scrollX.value,
-            inputRange,
-            [8, 24, 8],
-            'clamp'
-          );
-          const opacity = interpolate(
-            scrollX.value,
-            inputRange,
-            [0.5, 1, 0.5],
-            'clamp'
-          );
-          return {
-            width: withSpring(width, { damping: 20, stiffness: 90 }),
-            opacity: withTiming(opacity, { duration: 300 }),
-          };
-        });
+const GetStartedButton = ({ onPress }: { onPress: () => void }) => {
+  const buttonScale = useSharedValue(1);
+  const buttonOpacity = useSharedValue(0);
 
-        return (
-          <Animated.View
-            key={index}
-            style={[styles.dot, dotStyle]}
-          />
-        );
-      })}
-    </View>
+  const buttonStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+    opacity: buttonOpacity.value,
+  }));
+
+  useEffect(() => {
+    buttonOpacity.value = withTiming(1, { duration: 1000, easing: Easing.out(Easing.exp) });
+  }, []);
+
+  return (
+    <TouchableOpacity
+      onPressIn={() => (buttonScale.value = withTiming(0.97, { duration: 100 }))}
+      onPressOut={() => (buttonScale.value = withTiming(1, { duration: 100 }))}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <Animated.View style={[styles.getStartedButton, buttonStyle]}>
+        <LinearGradient
+          colors={["#7F53AC", "#43C6AC"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.getStartedGradient}
+        >
+          <Text style={styles.getStartedText}>Get Started</Text>
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
   );
 };
 
 const Onboarding = () => {
   const router = useRouter();
-  const scrollX = useSharedValue(0);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const buttonScale = useSharedValue(1);
-
-  const updateIndex = (index: number) => {
-    setCurrentIndex(index);
-  };
-
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollX.value = event.contentOffset.x;
-    },
-    onMomentumEnd: (event) => {
-      const index = Math.round(event.contentOffset.x / width);
-      runOnJS(updateIndex)(index);
-    },
-  });
-
-  const buttonStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: withSpring(buttonScale.value, { damping: 15, stiffness: 150 }) }],
-    };
-  });
 
   const handleGetStarted = () => {
-    buttonScale.value = withSequence(
-      withTiming(0.9, { duration: 100 }),
-      withTiming(1, { duration: 100 }, () => {
-        runOnJS(router.push)("/auth");
-      })
-    );
+    router.push("/auth");
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-      <Animated.ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        decelerationRate="fast"
-        bounces={false}
-      >
-        {onboardingData.map((item, index) => (
-          <OnboardingSlide key={item.id} item={item} index={index} scrollX={scrollX} />
-        ))}
-      </Animated.ScrollView>
-
+      <StatusBar style="auto" />
+      <OnboardingSlide item={onboardingData} />
       <View style={styles.bottomContainer}>
-        <Pagination data={onboardingData} scrollX={scrollX} />
-        <Animated.View style={[buttonStyle]}>
-          <TouchableOpacity
-            style={styles.getStartedButton}
-            onPress={handleGetStarted}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.getStartedText}>
-              {currentIndex === onboardingData.length - 1 ? "Get Started" : "Skip"}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
+        <GetStartedButton onPress={handleGetStarted} />
       </View>
     </View>
   );
@@ -216,70 +143,78 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width,
     height,
-    paddingHorizontal: 20,
   },
-  imageContainer: {
-    width: width * 0.8,
-    height: width * 0.8,
-    marginBottom: 40,
+  iconCircle: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 60,
+    width: 120,
+    height: 120,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 30,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
+  textContainer: {
+    alignItems: "center",
+    paddingHorizontal: 40,
+    marginVertical: 6,
+  },
+  taglineContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  tagline: {
+    color: "#E0E0E0",
+    fontSize: 16,
+    fontWeight: "500",
+    textAlign: "center",
+    letterSpacing: 0.5,
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 15,
+    marginBottom: 8,
+    letterSpacing: 1.2,
   },
   description: {
     fontSize: 18,
     textAlign: "center",
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    lineHeight: 26,
+    fontWeight: "400",
+    opacity: 0.95,
   },
   bottomContainer: {
     position: "absolute",
     bottom: 50,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-  },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#fff",
-    marginHorizontal: 4,
+    paddingHorizontal: 30,
   },
   getStartedButton: {
-    backgroundColor: "#fff",
-    paddingVertical: 15,
     borderRadius: 30,
+    overflow: "hidden",
+    shadowColor: "#43C6AC",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  getStartedGradient: {
+    paddingVertical: 16,
     alignItems: "center",
     width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    borderRadius: 30,
   },
   getStartedText: {
-    color: onboardingData[0].backgroundColor[0],
-    fontSize: 18,
+    color: "#fff",
+    fontSize: 20,
     fontWeight: "bold",
+    letterSpacing: 1.1,
   },
 });
 

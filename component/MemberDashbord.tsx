@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react"
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from "react-native"
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import {
   totalMemberCount,
@@ -49,6 +49,7 @@ export default function MembersDashboard() {
   const [totalAmount, setTotalAmount] = useState<number>(0)
   const [dueAmount, setDueAmount] = useState<number>(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const router = useRouter()
 
@@ -83,6 +84,9 @@ export default function MembersDashboard() {
   useEffect(() => {
     if (activeLibrary) {
       fetchStats()
+      setIsLoading(false)
+    } else {
+      setIsLoading(true)
     }
   }, [activeLibrary, fetchStats])
 
@@ -158,6 +162,14 @@ export default function MembersDashboard() {
       onPress: () => router.push("/allotseats"),
     }
   ]
+
+   if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#02c39a" />
+      </View>
+    )
+  }
 
   return (
     <ScrollView
@@ -296,6 +308,18 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
     color: "#333",
+  },
+ loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
   },
 })
 
