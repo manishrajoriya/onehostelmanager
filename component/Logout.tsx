@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, SafeAreaView, TextInput } from "react-native";
-import { auth } from "../utils/firebaseConfig"; // Import Firebase auth
+import { auth, db, storage } from "../utils/firebaseConfig"; // Import Firebase auth, db and storage
 import { signOut, deleteUser, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { writeBatch, doc, collection, getDocs, query, where } from "firebase/firestore";
+import { ref, deleteObject } from "firebase/storage";
 import { useRouter } from "expo-router";
 import useStore from "@/hooks/store";
 
@@ -90,8 +92,71 @@ const LogoutScreen = () => {
         throw new Error("No user found. Please try logging in again.");
       }
 
+      // Reauthenticate user
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
+
+      // Delete all user data from Firestore
+      const batch = writeBatch(db);
+      
+      // Delete user document
+      const userRef = doc(db, "users", user.uid);
+      batch.delete(userRef);
+
+      // Delete libraries
+      const librariesQuery = query(collection(db, "libraries"), where("admin", "==", user.uid));
+      const librariesSnapshot = await getDocs(librariesQuery);
+      librariesSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      // Delete members
+      const membersQuery = query(collection(db, "members"), where("admin", "==", user.uid));
+      const membersSnapshot = await getDocs(membersQuery);
+      membersSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      // Delete plans
+      const plansQuery = query(collection(db, "plans"), where("admin", "==", user.uid));
+      const plansSnapshot = await getDocs(plansQuery);
+      plansSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      // Delete attendance records
+      const attendanceQuery = query(collection(db, "attendance"), where("admin", "==", user.uid));
+      const attendanceSnapshot = await getDocs(attendanceQuery);
+      attendanceSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      // Delete finance records
+      const financeQuery = query(collection(db, "finance"), where("userId", "==", user.uid));
+      const financeSnapshot = await getDocs(financeQuery);
+      financeSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      // Delete rooms
+      const roomsQuery = query(collection(db, "rooms"), where("admin", "==", user.uid));
+      const roomsSnapshot = await getDocs(roomsQuery);
+      roomsSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      // Commit all deletions
+      await batch.commit();
+
+      // Delete user storage files
+      const storageRef = ref(storage, `upload/${user.uid}`);
+      try {
+        await deleteObject(storageRef);
+      } catch (error) {
+        console.log("No storage files to delete or error deleting storage:", error);
+      }
+
+      // Finally delete the user account
       await deleteUser(user);
       clearCurrentUser();
       clearActiveLibrary();

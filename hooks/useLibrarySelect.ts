@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getLibraries, addLibrary } from "@/firebase/functions";
+import { getLibraries } from "@/firebase/functions";
 import useStore from "@/hooks/store";
 import { useRouter } from "expo-router";
 
@@ -29,20 +29,6 @@ export function useLibrarySelection() {
           setActiveLibrary(data[0]);
         }
         setError(null);
-      } else {
-        if (currentUser && libraries.length === 0) {
-          const newLibrary = {
-            name: "First Hostel",
-            address: "N/A",
-            description: "Edit this hostel to add your own hostel details",
-          };
-          await addLibrary({ data: newLibrary, currentUser });
-          const updatedLibraries = await getLibraries({ currentUser });
-          if (updatedLibraries.length > 0) {
-            setLibraries(updatedLibraries);
-            setActiveLibrary(updatedLibraries[0]);
-          }
-        }
       }
     } catch (error) {
       console.error("Error fetching libraries:", error);
@@ -78,6 +64,6 @@ export function useLibrarySelection() {
     error,
     activeLibrary,
     handleLibrarySelect,
-    refreshLibraries, // Expose the refresh function
+    refreshLibraries,
   };
 }

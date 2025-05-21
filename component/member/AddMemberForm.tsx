@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native"
 import { Controller } from "react-hook-form"
 import DateTimePicker from "@react-native-community/datetimepicker"
@@ -15,6 +16,7 @@ import { Picker } from "@react-native-picker/picker"
 import { addMember, totalMemberCount } from "@/firebase/functions"
 import Toast from "react-native-toast-message"
 import { useAddMemberForm } from "@/hooks/useAddMemberForm"
+import { useRouter } from "expo-router"
 
 import { pickImage, uploadImageToFirebase, pickImageSource } from "./ImageUpload"
 import type { FormData } from "@/types/MemberProfile"
@@ -32,6 +34,7 @@ export const formatDate = (date: Date) => {
 }
 
 export default function AddMemberForm() {
+  const router = useRouter()
   const {
     control,
     handleSubmit,
@@ -86,6 +89,23 @@ export default function AddMemberForm() {
         type: 'success',
         text1: 'Member added successfully',
       });
+      
+      // Show alert and navigate to allot room screen
+      Alert.alert(
+        "Success",
+        "Member added successfully! Would you like to allot a room now?",
+        [
+          {
+            text: "Later",
+            style: "cancel"
+          },
+          {
+            text: "Allot Room",
+            onPress: () => router.push("/allotseats")
+          }
+        ]
+      );
+
       // Reset form and update count
       Object.keys(data).forEach((key) => setValue(key as keyof FormData, ''));
       setValue('admissionDate', new Date());
