@@ -16,7 +16,8 @@ import {
   runTransaction,
   FieldValue,
   serverTimestamp,
-  type DocumentReference
+  type DocumentReference,
+  setDoc
 } from "firebase/firestore"; 
 import { db } from "@/utils/firebaseConfig";
 
@@ -483,3 +484,7 @@ export async function getAllMembers(params: {
 
   return allMembers;
 }
+
+
+
+

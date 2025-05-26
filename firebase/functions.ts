@@ -995,3 +995,25 @@ export async function getMemberPlanHistory({ memberId }: { memberId: string }) {
     throw error;
   }
 }
+
+// Helper function to generate storage paths
+export const generateStoragePath = ({
+  userId,
+  libraryId,
+  type,
+  filename
+}: {
+  userId: string;
+  libraryId?: string;
+  type?: string;
+  filename: string;
+}) => {
+  const timestamp = Date.now();
+  const basePath = `upload/${userId}`;
+  
+  if (libraryId) {
+    return `${basePath}/${libraryId}/${type || 'general'}/${timestamp}-${filename}`;
+  }
+  
+  return `${basePath}/${type || 'general'}/${timestamp}-${filename}`;
+};

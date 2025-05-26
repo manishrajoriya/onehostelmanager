@@ -28,6 +28,6 @@ export const auth = initializeAuth(app, {
 
 // Initialize other Firebase services
 export const db = getFirestore(app);
-// Initialize second database
+// // Initialize second database
 // export const db2 = getFirestore(app, "onelibrary02");
 export const storage = getStorage(app);
