@@ -35,6 +35,7 @@ interface Seat {
   memberExpiryDate?: Date;
   roomType: RoomType;
   roomNumber: string;
+  rent: number;
 }
 
 const AllocateSeatsPage: React.FC = () => {
@@ -271,6 +272,7 @@ const AllocateSeatsPage: React.FC = () => {
         <Text style={styles.roomInfo}>
           {item.roomNumber} ({item.roomType})
         </Text>
+        <Text style={styles.roomInfo}>Rent: {item.rent ? item.rent : 'Not set'}</Text>
       </View>
       <View style={styles.seatStatus}>
         {item.isAllocated ? (

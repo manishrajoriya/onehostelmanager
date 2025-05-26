@@ -598,12 +598,13 @@ export const getAttendanceById = async (id: string) => {
   }
 }
 
-export const addSeats = async ({ currentUser, numberOfSeats, libraryId, roomType, roomNumber }: {
+export const addSeats = async ({ currentUser, numberOfSeats, libraryId, roomType, roomNumber, rent }: {
   currentUser: any;
   numberOfSeats: number;
   libraryId: string;
   roomType: 'AC' | 'Non-AC' | 'Dormitory';
   roomNumber: string;
+  rent:number
 }) => {
   try {
     if (!currentUser) {
@@ -634,6 +635,7 @@ export const addSeats = async ({ currentUser, numberOfSeats, libraryId, roomType
         libraryId: libraryId,
         roomType: roomType,
         roomNumber: roomNumber,
+        rent:rent
       });
     }
 
@@ -741,7 +743,8 @@ export const fetchSeats = async ({currentUser, libraryId }: { currentUser: any, 
       memberName: doc.data().memberName,
       memberExpiryDate: doc.data().memberExpiryDate,
       roomType: doc.data().roomType,
-      roomNumber: doc.data().roomNumber
+      roomNumber: doc.data().roomNumber,
+      rent: doc.data().rent
     }));
     return seats;
   } catch (error) {

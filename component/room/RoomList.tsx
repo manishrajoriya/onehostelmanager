@@ -21,6 +21,7 @@ interface Room {
   roomNumber: string;
   capacity: string;
   roomType: string;
+  rent: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +34,7 @@ const RoomsScreen = () => {
     roomNumber: '',
     capacity: '',
     roomType: '',
+    rent: '',
   });
 
   const currentUser = useStore((state: any) => state.currentUser);
@@ -83,6 +85,7 @@ const RoomsScreen = () => {
         roomNumber: '',
         capacity: '',
         roomType: '',
+        rent: '',
       });
       setModalVisible(false);
       fetchRooms();
@@ -198,7 +201,16 @@ const RoomsScreen = () => {
                   keyboardType="numeric"
                 />
               </View>
-              
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Rent</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="1000"
+                  value={formData.rent}
+                  onChangeText={(text) => handleInputChange('rent', text)}
+                  keyboardType="numeric"
+                />
+              </View>
               <View style={styles.inputContainer}>
                 <Text style={styles.inputLabel}>Room Type</Text>
                 <TextInput

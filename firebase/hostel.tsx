@@ -26,6 +26,7 @@ export interface Room {
   roomNumber: string;
   capacity: number;
   occupiedBeds: number;
+  rent: number;
   roomType: 'AC' | 'Non-AC' | 'Dormitory';
   students: string[];
   createdAt?: Date;
@@ -36,6 +37,7 @@ export interface RoomUpdate {
   roomNumber?: string;
   capacity?: number;
   occupiedBeds?: number;
+  rent?: number;
   roomType?: 'AC' | 'Non-AC' | 'Dormitory';
   students?: string[];
 }
@@ -61,6 +63,9 @@ const validateRoomData = (room: Partial<Room>) => {
   if (!room.roomType || !['AC', 'Non-AC', 'Dormitory'].includes(room.roomType)) {
     throw new Error('Invalid room type');
   }
+  if (!room.rent || typeof room.rent !== 'number' || room.rent <= 0) {
+    throw new Error('Invalid rent value');
+  }
   
   if (!Array.isArray(room.students)) {
     throw new Error('Students must be an array');
@@ -77,6 +82,7 @@ export const addRooms = async ({currentUser, libraryId, roomsData}: {currentUser
             roomNumber: roomsData.roomNumber,
             capacity: roomsData.capacity,
             roomType: roomsData.roomType,
+            rent: roomsData.rent,
             createdAt: serverTimestamp() as unknown as Date,
             updatedAt: serverTimestamp() as unknown as Date,
             admin: currentUser.uid,
@@ -105,6 +111,7 @@ export const getRooms = async ({currentUser, libraryId}: {currentUser: any, libr
             capacity: doc.data().capacity,
             occupiedBeds: doc.data().occupiedBeds,
             roomType: doc.data().roomType,
+            rent: doc.data().rent || 0,
             createdAt: doc.data().createdAt?.toDate() || new Date(),
             updatedAt: doc.data().updatedAt?.toDate() || new Date()
         }));
@@ -161,6 +168,7 @@ export const fetchRoomsByType = async (roomType: RoomType): Promise<{ rooms: Roo
       capacity: doc.data().capacity || 0,
       occupiedBeds: doc.data().occupiedBeds || 0,
       roomType: doc.data().roomType || 'AC',
+      rent: doc.data().rent || 0,
       students: doc.data().students || [],
       createdAt: doc.data().createdAt?.toDate() || new Date(),
       updatedAt: doc.data().updatedAt?.toDate() || new Date()

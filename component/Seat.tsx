@@ -10,6 +10,7 @@ const AddSeatsPage = () => {
   const [roomType, setRoomType] = useState<RoomType>("AC");
   const [roomNumber, setRoomNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rent, setRent] = useState('')
 
   const currentUser = useStore((state: any) => state.currentUser)
   const activeLibrary = useStore((state: any) => state.activeLibrary)
@@ -21,7 +22,7 @@ const AddSeatsPage = () => {
         return;
       }
 
-      if (!numberOfSeats || !roomNumber) {
+      if (!numberOfSeats || !roomNumber || !rent) {
         Alert.alert('Error', 'Please fill all fields.');
         return;
       }
@@ -33,11 +34,13 @@ const AddSeatsPage = () => {
         libraryId: activeLibrary.id,
         roomType,
         roomNumber,
+        rent: parseInt(rent, 10)
       });
 
       Alert.alert('Success', `${numberOfSeats} seats added to ${roomType} room ${roomNumber}`);
       setNumberOfSeats('');
       setRoomNumber('');
+      setRent('')
     } catch (error) {
       Alert.alert('Error', error as string);
     } finally {
@@ -54,7 +57,7 @@ const AddSeatsPage = () => {
         <TextInput
           value={roomNumber}
           onChangeText={setRoomNumber}
-          placeholder="e.g. 10A"
+          placeholder="e.g. Floor 1, Room 1"
           keyboardType="default"
           style={styles.input}
         />
@@ -66,6 +69,17 @@ const AddSeatsPage = () => {
           value={numberOfSeats}
           onChangeText={setNumberOfSeats}
           placeholder="Enter number of beds"
+          keyboardType="numeric"
+          style={styles.input}
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Rent:</Text>
+        <TextInput
+          value={rent}
+          onChangeText={setRent}
+          placeholder="Enter rent"
           keyboardType="numeric"
           style={styles.input}
         />
