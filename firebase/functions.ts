@@ -626,7 +626,7 @@ export const addSeats = async ({ currentUser, numberOfSeats, libraryId, roomType
     // Add new seats to the room
     for (let i = 0; i < numberOfSeats; i++) {
       await addDoc(collection(db, "seats"), {
-        seatId: `${roomNumber}-bed-${currentSeatCount + i + 1}`,
+        seatId: `Bed-${currentSeatCount + i + 1}`,
         isAllocated: false,
         allocatedTo: null,
         memberName: null,
@@ -706,10 +706,21 @@ export const allotSeat = async (seatId: string, memberId: string, memberName: st
     await updateDoc(seatDoc, {
       isAllocated: true,
       allocatedTo: memberId,
+      memberId: memberId, // Store member ID for easy reference
       memberName: memberName,
       memberExpiryDate: expiryDate,
       lastUpdated: new Date(),
       updatedBy: currentUser.uid
+    });
+
+    // Update member document with seat information
+    const memberRef = doc(db, "members", memberId);
+    await updateDoc(memberRef, {
+      allocatedSeatId: seatId,
+      seatNumber: seat.seatId,
+      roomNumber: seat.roomNumber,
+      roomType: seat.roomType,
+      updatedAt: new Date()
     });
 
     return {
@@ -720,13 +731,15 @@ export const allotSeat = async (seatId: string, memberId: string, memberName: st
         roomNumber: seat.roomNumber,
         roomType: seat.roomType,
         memberName,
+        memberId,
         expiryDate
       }
     };
   } catch (error: any) {
+    console.error("Error allocating seat:", error);
     return {
       success: false,
-      message: error.message
+      message: error.message || "Failed to allocate seat"
     }
   }
 }

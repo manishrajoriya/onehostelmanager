@@ -14,14 +14,18 @@ import {
 } from "react-native";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { fetchSeats, allotSeat, deallocateSeat, deleteSeat } from "@/firebase/functions";
-import { getMembers } from "@/firebase/functions";
+import { getMembers, getMemberById } from "@/firebase/functions";
 import useStore from "@/hooks/store";
 
 interface Member {
   id: string;
   fullName: string;
-  expiryDate: Date;
+  expiryDate: any; // Firestore Timestamp or Date
   allocatedSeatId?: string;
+  phoneNumber?: string;
+  email?: string;
+  address?: string;
+  joiningDate?: any; // Firestore Timestamp or Date
 }
 
 type RoomType = "AC" | "Non-AC" | "Dormitory";
@@ -31,6 +35,7 @@ interface Seat {
   seatId: string;
   isAllocated: boolean;
   allocatedTo?: string;
+  memberId?: string;
   memberName?: string;
   memberExpiryDate?: Date;
   roomType: RoomType;
@@ -52,6 +57,8 @@ const AllocateSeatsPage: React.FC = () => {
   const [lastVisibleDoc, setLastVisibleDoc] = useState<any>(null);
   const [hasMoreMembers, setHasMoreMembers] = useState<boolean>(true);
   const [selectedRoomType, setSelectedRoomType] = useState<RoomType | "All">("All");
+  const [selectedMemberDetails, setSelectedMemberDetails] = useState<Member | null>(null);
+  const [loadingMemberDetails, setLoadingMemberDetails] = useState(false);
 
   const currentUser = useStore((state: any) => state.currentUser);
   const activeLibrary = useStore((state: any) => state.activeLibrary);
@@ -250,47 +257,96 @@ const AllocateSeatsPage: React.FC = () => {
     );
   };
 
-  const renderSeat = ({ item }: { item: Seat }) => (
-    <TouchableOpacity
-      style={[
-        styles.seatItem,
-        selectedSeat === item.id && styles.selectedSeatItem,
-        item.isAllocated && styles.allocatedSeatItem,
-      ]}
-      onPress={() => {
-        setSelectedSeat(item.id);
-        setSelectedSeatData(item);
-      }}
-    >
-      <MaterialIcons
-        name={item.isAllocated ? "person" : "event-seat"}
-        size={24}
-        color={item.isAllocated ? "#ff4444" : "#02c39a"}
-      />
-      <View style={styles.seatInfo}>
-        <Text style={styles.seatId}>{item.seatId}</Text>
-        <Text style={styles.roomInfo}>
-          {item.roomNumber} ({item.roomType})
-        </Text>
-        <Text style={styles.roomInfo}>Rent: {item.rent ? item.rent : 'Not set'}</Text>
+  const fetchMemberDetails = async (memberId: string) => {
+    setLoadingMemberDetails(true);
+    try {
+      console.log("Fetching member details for ID:", memberId);
+      const memberDetails = await getMemberById({ id: memberId });
+      console.log("Member details fetched:", memberDetails);
+      setSelectedMemberDetails(memberDetails);
+    } catch (error: any) {
+      console.error("Error fetching member details:", error);
+      Alert.alert(
+        "Error",
+        `Failed to load member details: ${error.message || "Unknown error"}`
+      );
+    } finally {
+      setLoadingMemberDetails(false);
+    }
+  };
+
+  const handleSeatPress = async (seat: Seat) => {
+    setSelectedSeat(seat.id);
+    setSelectedSeatData(seat);
+    if (seat.isAllocated && seat.allocatedTo) {
+      console.log("Fetching details for allocated seat:", seat);
+      await fetchMemberDetails(seat.allocatedTo);
+    }
+  };
+
+  // Group seats by room number
+  const groupedSeats = React.useMemo(() => {
+    const groups: { [key: string]: Seat[] } = {};
+    filteredSeats.forEach(seat => {
+      if (!groups[seat.roomNumber]) {
+        groups[seat.roomNumber] = [];
+      }
+      groups[seat.roomNumber].push(seat);
+    });
+    return groups;
+  }, [filteredSeats]);
+
+  const renderRoomGroup = ({ item: roomNumber }: { item: string }) => (
+    <View style={styles.roomGroup}>
+      <View style={styles.roomHeader}>
+        <MaterialIcons 
+          name={selectedRoomType === "AC" ? "ac-unit" : selectedRoomType === "Non-AC" ? "hotel" : "people"} 
+          size={24} 
+          color="#02c39a" 
+        />
+        <Text style={styles.roomNumber}>Room {roomNumber}</Text>
+        <Text style={styles.roomType}>{selectedRoomType}</Text>
       </View>
-      <View style={styles.seatStatus}>
-        {item.isAllocated ? (
-          <>
-            <Text style={styles.allocatedText}>Allocated</Text>
-            <Text style={styles.memberName}>{item.memberName}</Text>
-          </>
-        ) : (
-          <Text style={styles.availableText}>Available</Text>
-        )}
+      <View style={styles.seatsContainer}>
+        {groupedSeats[roomNumber].map((seat) => (
+          <TouchableOpacity
+            key={seat.id}
+            style={[
+              styles.seatItem,
+              selectedSeat === seat.id && styles.selectedSeatItem,
+              seat.isAllocated && styles.allocatedSeatItem,
+            ]}
+            onPress={() => handleSeatPress(seat)}
+          >
+            <MaterialIcons
+              name={seat.isAllocated ? "person" : "event-seat"}
+              size={24}
+              color={seat.isAllocated ? "#ff4444" : "#02c39a"}
+            />
+            <View style={styles.seatInfo}>
+              <Text style={styles.seatId}>{seat.seatId}</Text>
+              <Text style={styles.rentText}>₹{seat.rent || 'Not set'}</Text>
+            </View>
+            <View style={styles.seatStatus}>
+              {seat.isAllocated ? (
+                <>
+                  <Text style={styles.allocatedText}>Occupied</Text>
+                  <Text style={styles.memberName} numberOfLines={1}>{seat.memberName}</Text>
+                </>
+              ) : (
+                <Text style={styles.availableText}>Available</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteSeat(seat.id)}
+            >
+              <MaterialIcons name="delete" size={24} color="#ff4444" />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        ))}
       </View>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteSeat(item.id)}
-      >
-        <MaterialIcons name="delete" size={24} color="#ff4444" />
-      </TouchableOpacity>
-    </TouchableOpacity>
+    </View>
   );
 
   const renderMember = ({ item }: { item: Member }) => (
@@ -304,17 +360,26 @@ const AllocateSeatsPage: React.FC = () => {
     >
       <Text style={styles.memberName}>{item.fullName}</Text>
       {item.allocatedSeatId ? (
-        <Text style={styles.allocatedSeatText}>Already allocated</Text>
+        <Text style={styles.allocatedText}>Already allocated</Text>
       ) : (
-        <Text style={styles.availableSeatText}>Available</Text>
+        <Text style={styles.availableText}>Available</Text>
       )}
     </TouchableOpacity>
   );
 
+  const formatDate = (date: any) => {
+    if (!date) return 'Not set';
+    if (date instanceof Date) {
+      return date.toLocaleDateString();
+    }
+    if (date.seconds) {
+      return new Date(date.seconds * 1000).toLocaleDateString();
+    }
+    return 'Invalid date';
+  };
+
   return (
     <View style={styles.container}>
-     
-
       <View style={styles.filterSection}>
         <Text style={styles.sectionTitle}>Filter Rooms</Text>
         <ScrollView 
@@ -350,9 +415,9 @@ const AllocateSeatsPage: React.FC = () => {
       </View>
 
       <FlatList
-        data={filteredSeats}
-        renderItem={renderSeat}
-        keyExtractor={(item) => item.id}
+        data={Object.keys(groupedSeats)}
+        renderItem={renderRoomGroup}
+        keyExtractor={(item) => item}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -364,7 +429,10 @@ const AllocateSeatsPage: React.FC = () => {
         visible={!!selectedSeatData}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setSelectedSeatData(null)}
+        onRequestClose={() => {
+          setSelectedSeatData(null);
+          setSelectedMemberDetails(null);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -372,7 +440,10 @@ const AllocateSeatsPage: React.FC = () => {
               <Text style={styles.modalTitle}>Room Details</Text>
               <TouchableOpacity 
                 style={styles.closeButton}
-                onPress={() => setSelectedSeatData(null)}
+                onPress={() => {
+                  setSelectedSeatData(null);
+                  setSelectedMemberDetails(null);
+                }}
               >
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
@@ -409,10 +480,51 @@ const AllocateSeatsPage: React.FC = () => {
 
               {selectedSeatData?.isAllocated ? (
                 <View style={styles.actionSection}>
-                  <View style={styles.memberInfo}>
-                    <Text style={styles.memberLabel}>Current Member:</Text>
-                    <Text style={styles.memberName}>{selectedSeatData.memberName}</Text>
-                  </View>
+                  {loadingMemberDetails ? (
+                    <ActivityIndicator size="large" color="#02c39a" />
+                  ) : selectedMemberDetails ? (
+                    <View style={styles.memberDetailsCard}>
+                      <Text style={styles.memberDetailsTitle}>Member Information</Text>
+                      <View style={styles.memberDetailRow}>
+                        <Text style={styles.memberDetailLabel}>Name:</Text>
+                        <Text style={styles.memberDetailValue}>{selectedMemberDetails.fullName}</Text>
+                      </View>
+                      {selectedMemberDetails.phoneNumber && (
+                        <View style={styles.memberDetailRow}>
+                          <Text style={styles.memberDetailLabel}>Phone:</Text>
+                          <Text style={styles.memberDetailValue}>{selectedMemberDetails.phoneNumber}</Text>
+                        </View>
+                      )}
+                      {selectedMemberDetails.email && (
+                        <View style={styles.memberDetailRow}>
+                          <Text style={styles.memberDetailLabel}>Email:</Text>
+                          <Text style={styles.memberDetailValue}>{selectedMemberDetails.email}</Text>
+                        </View>
+                      )}
+                      {selectedMemberDetails.address && (
+                        <View style={styles.memberDetailRow}>
+                          <Text style={styles.memberDetailLabel}>Address:</Text>
+                          <Text style={styles.memberDetailValue}>{selectedMemberDetails.address}</Text>
+                        </View>
+                      )}
+                      <View style={styles.memberDetailRow}>
+                        <Text style={styles.memberDetailLabel}>Expiry Date:</Text>
+                        <Text style={styles.memberDetailValue}>
+                          {formatDate(selectedMemberDetails.expiryDate)}
+                        </Text>
+                      </View>
+                      {selectedMemberDetails.joiningDate && (
+                        <View style={styles.memberDetailRow}>
+                          <Text style={styles.memberDetailLabel}>Joining Date:</Text>
+                          <Text style={styles.memberDetailValue}>
+                            {formatDate(selectedMemberDetails.joiningDate)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <Text style={styles.errorText}>Failed to load member details</Text>
+                  )}
                   <TouchableOpacity
                     style={styles.deallocateButton}
                     onPress={() => handleDeallocateSeat(selectedSeatData.id)}
@@ -493,9 +605,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "600",
     color: "#333",
     marginBottom: 12,
@@ -532,20 +649,48 @@ const styles = StyleSheet.create({
   seatsListContent: {
     padding: 16,
   },
-  seatItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    marginBottom: 12,
+  roomGroup: {
+    marginBottom: 24,
     backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderRadius: 16,
+    overflow: "hidden",
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  roomHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#f8f9fa",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e0e0e0",
+  },
+  roomNumber: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginLeft: 8,
+  },
+  roomType: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 8,
+  },
+  seatsContainer: {
+    padding: 12,
+  },
+  seatItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
   },
   selectedSeatItem: {
     borderColor: "#02c39a",
@@ -553,14 +698,6 @@ const styles = StyleSheet.create({
   },
   allocatedSeatItem: {
     borderColor: "#ff4444",
-  },
-  allocatedSeatText: {
-    color: "#ff4444",
-    fontWeight: "500",
-  },
-  availableSeatText: {
-    color: "#02c39a",
-    fontWeight: "500",
   },
   seatInfo: {
     flex: 1,
@@ -571,12 +708,13 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#333",
   },
-  roomInfo: {
+  rentText: {
     fontSize: 14,
     color: "#666",
   },
   seatStatus: {
     alignItems: "flex-end",
+    marginRight: 8,
   },
   allocatedText: {
     color: "#ff4444",
@@ -585,6 +723,14 @@ const styles = StyleSheet.create({
   availableText: {
     color: "#02c39a",
     fontWeight: "500",
+  },
+  memberName: {
+    fontSize: 12,
+    color: "#666",
+    maxWidth: 120,
+  },
+  deleteButton: {
+    padding: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -663,10 +809,6 @@ const styles = StyleSheet.create({
   selectedMemberItem: {
     backgroundColor: "#e7f3ff",
   },
-  memberName: {
-    fontSize: 16,
-    color: "#333",
-  },
   allocateButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -698,19 +840,37 @@ const styles = StyleSheet.create({
     color: "#666",
     padding: 16,
   },
-  memberInfo: {
+  memberDetailsCard: {
     backgroundColor: "#f8f9fa",
-    padding: 16,
     borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
   },
-  memberLabel: {
+  memberDetailsTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
+  memberDetailRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  memberDetailLabel: {
+    flex: 1,
     fontSize: 14,
     color: "#666",
-    marginBottom: 4,
   },
-  deleteButton: {
-    padding: 8,
-    marginLeft: 8,
+  memberDetailValue: {
+    flex: 2,
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "500",
+  },
+  errorText: {
+    color: "#ff4444",
+    textAlign: "center",
+    marginVertical: 16,
   },
 });
 
