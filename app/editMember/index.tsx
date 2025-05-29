@@ -46,20 +46,13 @@ const UpdateMemberScreen = () => {
           setValue("fullName", data.fullName || "");
           setValue("contactNumber", data.contactNumber || "");
           setValue("email", data.email || "");
-          setValue("totalAmount", data.totalAmount || "");
-          setValue("paidAmount", data.paidAmount || "");
-          setValue("discount", data.discount || "");
-          setValue("dueAmount", data.dueAmount || "");
+         
           setValue("advanceAmount", data.advanceAmount || "");
           setValue("address", data.address || "");
           setValue("profileImage", data.profileImage || "");
           setValue("document", data.document || "");
           setValue("admissionDate", data.addmissionDate?.toDate() || new Date());
-          setValue("expiryDate", data.expiryDate?.toDate() || new Date());
-          setValue("plan", data.plan || "");
-          setValue("planId", data.planId || "");
-          setValue("status", data.status || "active");
-          setValue("seatNumber", data.seatNumber || "");
+         
         } else {
           Alert.alert("Error", "Member not found");
           router.back();
@@ -214,34 +207,7 @@ const formatDate = (date: any) => {
           name="email"
         />
 
-        {/* Plan Selection */}
-        <Controller
-          control={control}
-          rules={{ required: "Shift is required" }}
-          render={({ field: { onChange, value }, fieldState: { error } }) => (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Shift</Text>
-              <View style={[styles.pickerContainer, error && styles.inputError]}>
-                <Picker
-                  selectedValue={value}
-                  onValueChange={(itemValue, itemIndex) => {
-                    onChange(itemValue)
-                    setValue("planId", plans[itemIndex - 1]?.id || "")
-                  }}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Shift" value="" />
-                  {plans.map((plan) => (
-                    <Picker.Item key={plan.id} label={plan.name} value={plan.name} />
-                  ))}
-                </Picker>
-              </View>
-              {error && <Text style={styles.errorText}>{error.message}</Text>}
-            </View>
-          )}
-          name="plan"
-          />
-         
+
          {/* Advance Amount */}
          <Controller
           control={control}
@@ -263,89 +229,7 @@ const formatDate = (date: any) => {
         />
         
 
-        {/* Total, Paid, and Due Amount */}
-        <View style={styles.amountSection}>
-          <View style={styles.amountRow}>
-            <Controller
-              control={control}
-              render={({ field: { onChange, onBlur, value } }) => (
-                <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
-                  <Text style={styles.label}>Total Amount</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="0.00"
-                    keyboardType="numeric"
-                    editable={false}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                  />
-                </View>
-              )}
-              name="totalAmount"
-            />
-
-            <Controller
-              control={control}
-              rules={{ required: "Paid amount is required" }}
-              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
-                <View style={[styles.inputGroup, styles.flex1]}>
-                  <Text style={styles.label}>Paid Amount</Text>
-                  <TextInput
-                    style={[styles.input, error && styles.inputError]}
-                    placeholder="00"
-                    keyboardType="numeric"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                  />
-                  {error && <Text style={styles.errorText}>{error.message}</Text>}
-                </View>
-              )}
-              name="paidAmount"
-            />
-          </View>
-
-          <View style={styles.amountRow}>
-            <Controller
-              control={control}
-              render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
-                <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
-                  <Text style={styles.label}>Discount</Text>
-                  <TextInput
-                    style={[styles.input, error && styles.inputError]}
-                    placeholder="00"
-                    keyboardType="numeric"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                  />
-                  {error && <Text style={styles.errorText}>{error.message}</Text>}
-                </View>
-              )}
-              name="discount"
-            />
-
-            <Controller
-              control={control}
-              render={({ field: { onChange, onBlur, value } }) => (
-                <View style={[styles.inputGroup, styles.flex1]}>
-                  <Text style={styles.label}>Due Amount</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="00"
-                    editable={false}
-                    keyboardType="numeric"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                  />
-                </View>
-              )}
-              name="dueAmount"
-            />
-          </View>
-        </View>
+      
 
         {/* Admission Date */}
         <Controller
@@ -379,37 +263,6 @@ const formatDate = (date: any) => {
           name="admissionDate"
         />
 
-        {/* Expiry Date */}
-        <Controller
-          control={control}
-          rules={{ required: "Expiry date is required" }}
-          render={({ field: { onChange, value }, fieldState: { error } }) => (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Expiry Date</Text>
-              <TouchableOpacity
-                style={[styles.dateButton, error && styles.inputError]}
-                onPress={() => setShowExpiryDate(true)}
-              >
-                <Text>{formatDate(value)}</Text>
-              </TouchableOpacity>
-              {showExpiryDate && (
-                <DateTimePicker
-                  value={value}
-                  mode="date"
-                  display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={(event, selectedDate) => {
-                    setShowExpiryDate(false)
-                    if (selectedDate) {
-                      onChange(selectedDate)
-                    }
-                  }}
-                />
-              )}
-              {error && <Text style={styles.errorText}>{error.message}</Text>}
-            </View>
-          )}
-          name="expiryDate"
-        />
 
         {/* Upload Buttons */}
         <View style={styles.uploadButtonsContainer}>
@@ -422,7 +275,7 @@ const formatDate = (date: any) => {
         </View>
 
         {/* Display Uploaded Files */}
-        {isLoading && <ActivityIndicator size="large" color="#6d28d9" />}
+        {isLoading && <ActivityIndicator size="large" color="#02c39a" />}
         {watchProfileImage && (
           <View style={styles.uploadedFileContainer}>
             <Text style={styles.uploadedFileText}>Profile Image:</Text>

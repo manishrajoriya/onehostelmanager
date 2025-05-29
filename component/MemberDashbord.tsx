@@ -1,15 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react"
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import {
-  totalMemberCount,
-  liveMemberCount,
-  InactiveMemberCount,
-  paidAmountCount,
-  totalAmountCount,
-  dueAmountCount,
-  
-} from "@/firebase/functions"
+
 import { useRouter } from "expo-router"
 import useStore from "@/hooks/store"
 
@@ -63,19 +55,19 @@ export default function MembersDashboard() {
     if (!activeLibrary) return
 
     try {
-      const total = await totalMemberCount({ currentUser, libraryId: activeLibrary.id })
-      const live = await liveMemberCount({ currentUser, libraryId: activeLibrary.id })
-      const inactive = await InactiveMemberCount({ currentUser, libraryId: activeLibrary.id })
-      const paidAmount = await paidAmountCount({ currentUser, libraryId: activeLibrary.id })
-      const totalAmount = await totalAmountCount({ currentUser, libraryId: activeLibrary.id })
-      const dueAmount = await dueAmountCount({ currentUser, libraryId: activeLibrary.id })
+      // const total = await totalMemberCount({ currentUser, libraryId: activeLibrary.id })
+      // const live = await liveMemberCount({ currentUser, libraryId: activeLibrary.id })
+      // const inactive = await InactiveMemberCount({ currentUser, libraryId: activeLibrary.id })
+      // const paidAmount = await paidAmountCount({ currentUser, libraryId: activeLibrary.id })
+      // const totalAmount = await totalAmountCount({ currentUser, libraryId: activeLibrary.id })
+      // const dueAmount = await dueAmountCount({ currentUser, libraryId: activeLibrary.id })
 
-      setMember(total)
-      setLiveMember(live)
-      setInactiveMember(inactive)
-      setPaidAmount(paidAmount)
-      setTotalAmount(totalAmount)
-      setDueAmount(dueAmount)
+      // setMember(total)
+      // setLiveMember(live)
+      // setInactiveMember(inactive)
+      // setPaidAmount(paidAmount)
+      // setTotalAmount(totalAmount)
+      // setDueAmount(dueAmount)
     } catch (error) {
       console.error("Error fetching stats:", error)
     }
@@ -100,7 +92,7 @@ export default function MembersDashboard() {
     {
       icon: "people",
       title: "Members",
-      value: member.toString(),
+      value: '',
       color: "#4285F4",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberProfileCard"),
@@ -108,7 +100,7 @@ export default function MembersDashboard() {
     {
       icon: "people",
       title: "Live Members",
-      value: liveMember.toString(),
+      value: '',
       color: "#34A853",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberProfileCard"),
@@ -116,7 +108,7 @@ export default function MembersDashboard() {
     {
       icon: "person-remove",
       title: "Inactive Members",
-      value: inactiveMember.toString(),
+      value: '',
       color: "#EA4335",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberProfileCard"),
@@ -124,7 +116,7 @@ export default function MembersDashboard() {
     {
       icon: "card",
       title: "Total Amount",
-      value: totalAmount.toString(),
+      value: '',
       color: "#4285F4",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberPaymemt"),
@@ -132,7 +124,7 @@ export default function MembersDashboard() {
     {
       icon: "cash",
       title: "Paid Amount",
-      value: paidAmount.toString(),
+      value: '',
       color: "#9C27B0",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberPaymemt"),
@@ -140,7 +132,7 @@ export default function MembersDashboard() {
     {
       icon: "time",
       title: "Due Amount",
-      value: dueAmount.toString(),
+      value: '',
       color: "#FB8C00",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberPaymemt"),

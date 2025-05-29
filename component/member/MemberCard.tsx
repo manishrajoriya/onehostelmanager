@@ -1,8 +1,30 @@
-import React from "react"
+import React, { useEffect, useState } from "react"
 import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native"
 import { MaterialIcons } from "@expo/vector-icons"
 import { ActionButtons } from "./MemberCardActionButton"
 import type { MemberDetails } from "@/types/MemberProfile"
+import { fetchSeats } from "@/firebase/functions"
+import useStore from "@/hooks/store"
+
+interface RentDetails {
+  startDate: string;
+  endDate: string;
+  paidAmount: number;
+  dueAmount: number;
+  paymentDate: Date;
+}
+
+interface SeatDetails {
+  roomNumber: string;
+  roomType: string;
+  rent: number;
+}
+
+interface MemberCardProps {
+  member: MemberDetails;
+  onPress: () => void;
+  rentDetails?: RentDetails;
+}
 
 const getInitials = (name: string) => {
   return name
@@ -19,15 +41,85 @@ const formatDate = (date: Date | string): string => {
     return "Invalid Date"
   }
 
-  return parsedDate.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
+  const day = parsedDate.getDate().toString().padStart(2, '0')
+  const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0')
+  const year = parsedDate.getFullYear()
+
+  return `${day}/${month}/${year}`
 }
 
-const MemberCard: React.FC<{ member: MemberDetails, onPress: () => void }> = React.memo(
-  ({ member, onPress }) => {
+const MemberCard: React.FC<MemberCardProps> = React.memo(
+  ({ member, onPress, rentDetails }) => {
+    const [seatDetails, setSeatDetails] = useState<SeatDetails | null>(null);
+    const currentUser = useStore((state: any) => state.currentUser);
+    const activeLibrary = useStore((state: any) => state.activeLibrary);
+
+    useEffect(() => {
+      const fetchSeatDetails = async () => {
+        try {
+          const seats = await fetchSeats({ currentUser, libraryId: activeLibrary.id });
+          const memberSeat = seats.find(seat => seat.allocatedTo === member.id);
+          if (memberSeat) {
+            setSeatDetails({
+              roomNumber: memberSeat.roomNumber,
+              roomType: memberSeat.roomType,
+              rent: memberSeat.rent
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching seat details:", error);
+        }
+      };
+
+      fetchSeatDetails();
+    }, [member.id, currentUser, activeLibrary.id]);
+
+    const calculateStatus = () => {
+      if (!rentDetails) {
+        return { 
+          status: "Pending", 
+          style: styles.dueAmount, 
+          badgeColor: "#FEF3C7", 
+          textColor: "#D97706" 
+        };
+      }
+      
+      const today = new Date();
+      console.log("today:", today);
+      const endDate = new Date(rentDetails.endDate);
+      console.log("endDate:", endDate);
+      
+      const isActive = endDate > today;
+      const isPaid = rentDetails.dueAmount === 0;
+
+      if (!isActive) {
+        return { 
+          status: "Expired", 
+          style: styles.expiredAmount, 
+          badgeColor: "#FEE2E2", 
+          textColor: "#DC2626" 
+        };
+      }
+
+      if (isPaid) {
+        return { 
+          status: "Active & Paid", 
+          style: styles.paidAmount, 
+          badgeColor: "#DCFCE7", 
+          textColor: "#16A34A" 
+        };
+      }
+
+      return { 
+        status: "Active & Pending", 
+        style: styles.dueAmount, 
+        badgeColor: "#FEF3C7", 
+        textColor: "#D97706" 
+      };
+    };
+
+    const { status, style, badgeColor, textColor } = calculateStatus();
+
     return (
       <TouchableOpacity style={styles.container} onPress={onPress}>
         <View style={styles.header}>
@@ -52,41 +144,68 @@ const MemberCard: React.FC<{ member: MemberDetails, onPress: () => void }> = Rea
             </View>
           </View>
           <View style={styles.statusSection}>
-            <View style={[styles.statusBadge, { backgroundColor: member.expiryDate > new Date() ? "#E9D5FF" : "#FEE2E2" }]}>
-              <Text style={[styles.statusText, { color: member.expiryDate > new Date() ? "#02c39a" : "#DC2626" }]}>
-                {
-                  member.expiryDate > new Date() ? "Active" : "Expired"
-                }
+            <View style={[styles.statusBadge, { backgroundColor: badgeColor }]}>
+              <Text style={[styles.statusText, { color: textColor }]}>
+                {status}
               </Text>
             </View>
-            {/* <Text style={styles.seatText}>Seat: {member.seatNumber}</Text> */}
           </View>
         </View>
 
         <View style={styles.planSection}>
-          {[
-            { label: "Plan", value: member.plan || "N/A" },
-            { label: "Join Date", value: formatDate(member.addmissionDate) },
-            { label: "End Date", value: formatDate(member.expiryDate) },
-          ].map(({ label, value }) => (
-            <View key={`plan-${label}`} style={styles.planItem}>
-              <Text style={styles.planLabel}>{label}</Text>
-              <Text style={styles.planValue}>{value}</Text>
+          {rentDetails ? (
+            <>
+              <View style={styles.planItem}>
+                <Text style={styles.planLabel}>Joining Date</Text>
+                <Text style={styles.planValue}>{formatDate(member.addmissionDate)}</Text>
+              </View>
+              <View style={styles.planItem}>
+                <Text style={styles.planLabel}>Last Payment</Text>
+                <Text style={styles.planValue}>{formatDate(rentDetails.paymentDate)}</Text>
+              </View>
+              <View style={styles.planItem}>
+                <Text style={styles.planLabel}>Status</Text>
+                <Text style={[styles.planValue, style]}>{status}</Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.planItem}>
+              <Text style={styles.planLabel}>Joining Date</Text>
+              <Text style={styles.planValue}>{formatDate(member.addmissionDate)}</Text>
             </View>
-          ))}
+          )}
         </View>
 
         <View style={styles.amountSection}>
-          {[
-            { label: "Final Amount", value: member.totalAmount, style: styles.finalAmount },
-            { label: "Paid Amount", value: member.paidAmount, style: styles.paidAmount },
-            { label: "Due Amount", value: member.dueAmount, style: styles.dueAmount },
-          ].map(({ label, value, style }) => (
-            <View key={`amount-${label}`} style={styles.amountItem}>
-              <Text style={styles.amountLabel}>{label}</Text>
-              <Text style={style}>₹{value}</Text>
+          {seatDetails ? (
+            [
+              { 
+                label: "Room Rent", 
+                value: seatDetails.rent, 
+                style: styles.finalAmount 
+              },
+              { 
+                label: "Paid Amount", 
+                value: rentDetails?.paidAmount || 0, 
+                style: styles.paidAmount 
+              },
+              { 
+                label: "Due Amount", 
+                value: rentDetails?.dueAmount || 0, 
+                style: styles.dueAmount 
+              },
+            ].map(({ label, value, style }) => (
+              <View key={`amount-${label}`} style={styles.amountItem}>
+                <Text style={styles.amountLabel}>{label}</Text>
+                <Text style={style}>₹{value}</Text>
+              </View>
+            ))
+          ) : (
+            <View style={styles.amountItem}>
+              <Text style={styles.amountLabel}>Room Rent</Text>
+              <Text style={styles.finalAmount}>Not Assigned</Text>
             </View>
-          ))}
+          )}
         </View>
 
         {/* <ActionButtons memberId={member.id} /> */}
@@ -94,7 +213,6 @@ const MemberCard: React.FC<{ member: MemberDetails, onPress: () => void }> = Rea
     )
   },
   (prevProps, nextProps) => {
-    // Custom comparison function
     return JSON.stringify(prevProps.member) === JSON.stringify(nextProps.member)
   },
 )
@@ -166,18 +284,50 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   statusBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 6,
+    borderRadius: 12,
+    backgroundColor: "#E9D5FF",
   },
   statusText: {
-    fontWeight: "600",
     fontSize: 12,
+    fontWeight: "600",
+    color: "#02c39a",
   },
   seatText: {
     color: "#4B5563",
     fontSize: 14,
+  },
+  details: {
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    paddingTop: 12,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 14,
+    color: "#666",
+  },
+  value: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "500",
+  },
+  noRent: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  avatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
   planSection: {
     flexDirection: "row",
@@ -220,19 +370,13 @@ const styles = StyleSheet.create({
     color: "#1F2937",
   },
   paidAmount: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#059669",
+    color: "#16A34A",
   },
   dueAmount: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#DC2626",
+    color: "#D97706",
   },
-  avatarImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  expiredAmount: {
+    color: "#DC2626",
   },
 })
 

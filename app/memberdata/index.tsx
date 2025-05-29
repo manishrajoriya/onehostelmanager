@@ -18,12 +18,15 @@ import {
 import { Picker } from "@react-native-picker/picker";
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { AntDesign, MaterialIcons } from "@expo/vector-icons"
-import { getMemberById, fetchSeatByMemberId, fetchAttendanceByMemberId, deleteMember, getMemberPlanHistory, extendMemberPlan, getPlans } from "@/firebase/functions"
+import { getMemberById, fetchSeatByMemberId, fetchAttendanceByMemberId, deleteMember, getMemberPlanHistory, extendMemberPlan, getPlans, fetchSeats } from "@/firebase/functions"
+import { addMonthlyRent } from "@/firebase/hostel"
 import Toast from "react-native-toast-message"
 import WhatsAppModal from "@/component/member/WhatsappMessage"
 import { generateAndShareInvoice } from "@/firebase/helper"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import useStore from "@/hooks/store"
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import { db } from "@/utils/firebaseConfig"
 
 
 interface MemberDetails {
@@ -33,18 +36,13 @@ interface MemberDetails {
   contactNumber: string
   email: string
   addmissionDate: Date
-  expiryDate: Date
-  status: string
-  seatNumber: string
+
+  profession: string
   profileImage: string
   document: string
-  dueAmount: number
-  totalAmount: number
-  paidAmount: number
-  discount: number
+
   advanceAmount: number
-  planId: string
-  plan: string
+
 }
 
 interface DetailRowProps {
@@ -66,23 +64,48 @@ interface Seat {
   allocatedTo: string
   memberName: string
   memberExpiryDate: Date
+  roomType: string
+  roomNumber: string
+  rent: number
 }
 
-interface PlanHistory {
+
+
+interface RentHistory {
   id: string;
-  name: string;
-  description: string;
-  duration: string;
-  amount: string;
-  createdAt: Date;
+  startDate: string;
+  endDate: string;
+  paidAmount: number;
+  dueAmount: number;
+  discount: number;
+  paymentDate: Date;
 }
 
-interface Plan {
-  id: string;
-  name: string;
-  description: string;
-  duration: string;
-  amount: string;
+interface InvoiceData {
+  invoiceNumber: string;
+  date: string;
+  memberName: string;
+  membershipId: string;
+  planName: string;
+  amount: number;
+  address: string;
+  contactNumber: string;
+  email: string;
+  admissionDate: string;
+  expiryDate: string;
+  totalAmount: number;
+  paidAmount: number;
+  dueAmount: number;
+  discount: number;
+  advanceAmount: number;
+  planHistory: {
+    id: string;
+    name: string;
+    description: string;
+    duration: string;
+    amount: string;
+    createdAt: Date;
+  }[];
 }
 
 const DetailRow: React.FC<DetailRowProps> = ({ label, value, icon }) => (
@@ -108,19 +131,77 @@ const MemberDetails: React.FC = () => {
   const [imageLoadError, setImageLoadError] = useState(false)
   const [isWhatsAppModalVisible, setIsWhatsAppModalVisible] = useState(false)
   const [messageTemplates, setMessageTemplates] = useState<string[]>([])
-  const [planHistory, setPlanHistory] = useState<PlanHistory[]>([])
   const [showPlanHistory, setShowPlanHistory] = useState(false)
   const [showPlanPicker, setShowPlanPicker] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<string>("")
   const [selectedPlanId, setSelectedPlanId] = useState<string>("")
   const [newExpiryDate, setNewExpiryDate] = useState<Date>(new Date())
-  const [plans, setPlans] = useState<Plan[]>([])
   const [isExtending, setIsExtending] = useState(false)
   const currentUser = useStore((state: any) => state.currentUser)
   const activeLibrary = useStore((state: any) => state.activeLibrary)
   const [discount, setDiscount] = useState<string>("0")
   const [paidAmount, setPaidAmount] = useState<string>("0")
+  const [showRentModal, setShowRentModal] = useState(false)
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+  const [dueAmount, setDueAmount] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [rentHistory, setRentHistory] = useState<RentHistory[]>([])
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false)
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false)
+  const [selectedStartDate, setSelectedStartDate] = useState(new Date())
+  const [selectedEndDate, setSelectedEndDate] = useState(() => {
+    const date = new Date()
+    date.setMonth(date.getMonth() + 1)
+    return date
+  })
+  const [latestRent, setLatestRent] = useState<RentHistory | null>(null)
+  const [seatRent, setSeatRent] = useState<number>(0);
+
+  const fetchRentHistory = async () => {
+    try {
+      if (!memberId) return
+      
+      const rentRef = collection(db, `tenants/${memberId}/rentPayments`)
+      const q = query(rentRef, orderBy("paymentDate", "desc"))
+      const querySnapshot = await getDocs(q)
+      
+      const history = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        startDate: doc.data().startDate,
+        endDate: doc.data().endDate,
+        paidAmount: doc.data().paidAmount,
+        dueAmount: doc.data().dueAmount,
+        discount: doc.data().discount || 0,
+        paymentDate: doc.data().paymentDate.toDate()
+      }))
+      
+      setRentHistory(history)
+      // Set the latest rent payment
+      if (history.length > 0) {
+        setLatestRent(history[0])
+      }
+    } catch (error) {
+      console.error("Error fetching rent history:", error)
+      Toast.show({
+        type: "error",
+        text1: "Failed to fetch rent history",
+      })
+    }
+  }
+
+  const fetchSeatRent = async () => {
+    try {
+      const seats = await fetchSeats({ currentUser, libraryId: activeLibrary.id });
+      const memberSeat = seats.find((seat: Seat) => seat.allocatedTo === memberId);
+      if (memberSeat) {
+        setSeatRent(memberSeat.rent);
+      }
+    } catch (error) {
+      console.error("Error fetching seat rent:", error);
+    }
+  };
 
   const fetchMemberData = async () => {
     try {
@@ -131,11 +212,14 @@ const MemberDetails: React.FC = () => {
         const fetchedAttendance = await fetchAttendanceByMemberId(memberId)
         setAttendanceData(fetchedAttendance)
 
-        const fetchedSeat = await fetchSeatByMemberId(memberId)
-        setSeat(fetchedSeat[0])
+        const seats = await fetchSeats({ currentUser, libraryId: activeLibrary.id });
+        const memberSeat = seats.find(seat => seat.allocatedTo === memberId);
+        if (memberSeat) {
+          setSeat(memberSeat);
+        }
 
-        const fetchedPlanHistory = await getMemberPlanHistory({ memberId })
-        setPlanHistory(fetchedPlanHistory)
+        await fetchRentHistory()
+        await fetchSeatRent()
       }
     } catch (error) {
       console.error("Error fetching member data:", error)
@@ -148,17 +232,6 @@ const MemberDetails: React.FC = () => {
     fetchMemberData()
   }, [memberId])
 
-  useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        const fetchedPlans = await getPlans({ currentUser, libraryId: activeLibrary.id })
-        setPlans(fetchedPlans)
-      } catch (error) {
-        console.error("Error fetching plans:", error)
-      }
-    }
-    fetchPlans()
-  }, [currentUser, activeLibrary.id])
 
   const handleMemberDelete = async () => {
     try {
@@ -209,37 +282,38 @@ const MemberDetails: React.FC = () => {
 
 
 
-   const handlePrintInvoice = async () => {
-    if (!member) return
-
+   const handlePrintInvoice = async (rent: any) => {
     try {
-      await generateAndShareInvoice({
-        invoiceNumber: "INV1", // You might want to generate this dynamically
-        date: new Date().toLocaleDateString(),
+      if (!member) return;
+
+      const invoiceData: InvoiceData = {
+        invoiceNumber: `RENT-${rent.id.slice(-6)}`,
+        date: rent.paymentDate.toLocaleDateString(),
         memberName: member.fullName,
         membershipId: member.id,
-        planName: member.plan,
-        amount: member.paidAmount,
-        // Additional member details
+        planName: seat?.roomType || 'Standard Room',
+        amount: rent.paidAmount + rent.dueAmount,
         address: member.address,
         contactNumber: member.contactNumber,
         email: member.email,
-        admissionDate: member.addmissionDate.toDateString(),
-        expiryDate: member.expiryDate.toDateString(),
-        totalAmount: member.totalAmount,
-        paidAmount: member.paidAmount,
-        dueAmount: member.dueAmount,
-        discount: member.discount,
-        advanceAmount: member.advanceAmount,
-        planHistory: planHistory.map(plan => ({
-          id: plan.id,
-          name: plan.name,
-          description: plan.description,
-          duration: plan.duration,
-          amount: plan.amount,
-          createdAt: plan.createdAt
-        }))
-      })
+        admissionDate: member.addmissionDate.toLocaleDateString(),
+        expiryDate: rent.endDate,
+        totalAmount: rent.paidAmount + rent.dueAmount,
+        paidAmount: rent.paidAmount,
+        dueAmount: rent.dueAmount,
+        discount: rent.discount || 0,
+        advanceAmount: member.advanceAmount || 0,
+        planHistory: [{
+          id: rent.id,
+          name: seat?.roomType || 'Standard Room',
+          description: `Room ${seat?.roomNumber || 'N/A'}`,
+          duration: `${rent.startDate} - ${rent.endDate}`,
+          amount: (rent.paidAmount + rent.dueAmount).toString(),
+          createdAt: rent.paymentDate
+        }]
+      }
+
+      await generateAndShareInvoice(invoiceData)
     } catch (error) {
       console.error("Error handling invoice print:", error)
       Toast.show({
@@ -250,56 +324,109 @@ const MemberDetails: React.FC = () => {
     }
   }
 
-  const handleExtendPlan = async () => {
-    if (!selectedPlan || !selectedPlanId) {
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+
+  const handleAddRent = async () => {
+    if (!selectedStartDate || !selectedEndDate) {
       Toast.show({
         type: "error",
-        text1: "Please select a plan",
+        text1: "Please select start and end dates",
+      })
+      return
+    }
+
+    if (!seatRent) {
+      Toast.show({
+        type: "error",
+        text1: "No room rent found for this member",
       })
       return
     }
 
     try {
-      setIsExtending(true)
-      const selectedPlanData = plans.find(plan => plan.id === selectedPlanId)
-      const planAmount = Number(selectedPlanData?.amount || "0")
-      const discountAmount = Number(discount || "0")
-      const paidAmountValue = Number(paidAmount || "0")
-      const totalAmount = planAmount - discountAmount
-      const dueAmount = totalAmount - paidAmountValue
+      setIsSubmitting(true)
       
-      await extendMemberPlan({
+      // Calculate total amount based on seat rent
+      const totalAmount = seatRent;
+      const discountAmount = Number(discount) || 0;
+      const paidAmountValue = Number(paidAmount) || 0;
+
+      // Calculate remaining due amount from previous rent
+      let remainingDue = 0;
+      if (latestRent && latestRent.dueAmount > 0) {
+        remainingDue = latestRent.dueAmount;
+      }
+
+      // Calculate total due amount including previous due
+      const totalDueAmount = totalAmount + remainingDue - paidAmountValue - discountAmount;
+
+      // If paid amount is less than total amount, calculate partial rent
+      let actualPaidAmount = paidAmountValue;
+      let actualDueAmount = totalDueAmount;
+
+      if (paidAmountValue < totalAmount) {
+        // Calculate partial rent based on paid amount
+        const partialRent = Math.floor((paidAmountValue / totalAmount) * 100);
+        const daysInMonth = 30; // Assuming 30 days in a month
+        const partialDays = Math.floor((partialRent / 100) * daysInMonth);
+        
+        // Adjust end date based on partial payment
+        const adjustedEndDate = new Date(selectedStartDate);
+        adjustedEndDate.setDate(adjustedEndDate.getDate() + partialDays);
+        
+        // Update the end date
+        setSelectedEndDate(adjustedEndDate);
+      }
+
+      await addMonthlyRent({
         memberId: member?.id!,
-        newPlanId: selectedPlanId,
-        newPlan: selectedPlan,
-        newExpiryDate,
-        additionalAmount: totalAmount,
+        startDate: selectedStartDate.toLocaleDateString(),
+        endDate: selectedEndDate.toLocaleDateString(),
+        paidAmount: actualPaidAmount,
+        dueAmount: actualDueAmount,
         discount: discountAmount,
-        paidAmount: paidAmountValue,
-        dueAmount: dueAmount
       })
 
       Toast.show({
         type: "success",
-        text1: "Plan extended successfully",
+        text1: "Rent payment added successfully",
       })
 
-      // Refresh member data
-      await fetchMemberData()
-      
+      // Refresh rent history
+      await fetchRentHistory()
+
       // Reset form
-      setSelectedPlan("")
-      setSelectedPlanId("")
-      setNewExpiryDate(new Date())
+      setShowRentModal(false)
+      setPaidAmount("")
+      setDueAmount("")
       setDiscount("0")
-      setPaidAmount("0")
+      setSelectedStartDate(new Date())
+      setSelectedEndDate(new Date())
     } catch (error: any) {
+      console.error("Error adding rent:", error)
       Toast.show({
         type: "error",
-        text1: error.message || "Failed to extend plan",
+        text1: error.message || "Failed to add rent payment",
       })
     } finally {
-      setIsExtending(false)
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartDatePicker(false)
+    if (selectedDate) {
+      setSelectedStartDate(selectedDate)
+      // Set end date to one month after the selected start date
+      const newEndDate = new Date(selectedDate)
+      newEndDate.setMonth(newEndDate.getMonth() + 1)
+      setSelectedEndDate(newEndDate)
     }
   }
 
@@ -406,33 +533,36 @@ const MemberDetails: React.FC = () => {
         )}
       </View>
 
-      {/* Plan History Section */}
+      {/* Rent History Section */}
       <TouchableOpacity style={styles.card} onPress={() => setShowPlanHistory(!showPlanHistory)}>
         <View style={styles.reportHeader}>
-          <Text style={styles.reportTitle}>Plan History</Text>
+          <Text style={styles.reportTitle}>Rent History</Text>
           <AntDesign name={showPlanHistory ? "up" : "down"} size={20} color="#02c39a" />
         </View>
         {showPlanHistory && (
           <View style={styles.planHistoryContainer}>
-            {planHistory.length > 0 ? (
-              planHistory.map((plan, index) => (
-                <View key={`${plan.id}-${plan.createdAt.getTime()}`} style={styles.planHistoryItem}>
+            {rentHistory.length > 0 ? (
+              rentHistory.map((rent, index) => (
+                <View key={rent.id} style={styles.planHistoryItem}>
                   <View style={styles.planHistoryHeader}>
-                    <Text style={styles.planHistoryName}>{plan.name}</Text>
+                    <Text style={styles.planHistoryName}>Rent Payment</Text>
                     <Text style={styles.planHistoryDate}>
-                      {plan.createdAt.toLocaleDateString()}
+                      {rent.paymentDate.toLocaleDateString()}
                     </Text>
                   </View>
-                  <Text style={styles.planHistoryDescription}>{plan.description}</Text>
                   <View style={styles.planHistoryDetails}>
-                    <Text style={styles.planHistoryDetail}>Duration: {plan.duration}</Text>
-                    <Text style={styles.planHistoryDetail}>Amount: ₹{plan.amount}</Text>
+                    <Text style={styles.planHistoryDetail}>Period: {rent.startDate} - {rent.endDate}</Text>
+                    <Text style={styles.planHistoryDetail}>Amount: ₹{rent.paidAmount}</Text>
                   </View>
-                  {index < planHistory.length - 1 && <View style={styles.planHistoryDivider} />}
+                  <View style={styles.planHistoryDetails}>
+                    <Text style={styles.planHistoryDetail}>Discount: ₹{rent.discount}</Text>
+                    <Text style={[styles.planHistoryDetail, styles.dueAmount]}>Due: ₹{rent.dueAmount}</Text>
+                  </View>
+                  {index < rentHistory.length - 1 && <View style={styles.planHistoryDivider} />}
                 </View>
               ))
             ) : (
-              <Text style={styles.noDataText}>No plan history available</Text>
+              <Text style={styles.noDataText}>No rent history available</Text>
             )}
           </View>
         )}
@@ -452,34 +582,147 @@ const MemberDetails: React.FC = () => {
         <TouchableOpacity style={styles.gymPlanButton} onPress={handleMemberUpdate}>
           <Text style={styles.gymPlanButtonText}>Update Member</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.gymPlanButton} onPress={() => setShowPlanPicker(true)}>
-          <Text style={styles.gymPlanButtonText}>Extend Plan</Text>
+        <TouchableOpacity style={styles.gymPlanButton} onPress={() => setShowRentModal(true)}>
+          <Text style={styles.gymPlanButtonText}>Add Rent</Text>
         </TouchableOpacity>
-        </View>
+      </View>
 
-      {/* Plan Details */}
+      {/* Rent Modal */}
+      <Modal
+        visible={showRentModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowRentModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Monthly Rent</Text>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Start Date</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowStartDatePicker(true)}
+              >
+                <Text>{formatDate(selectedStartDate)}</Text>
+              </TouchableOpacity>
+              {showStartDatePicker && (
+                <DateTimePicker
+                  value={selectedStartDate}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  onChange={handleStartDateChange}
+                />
+              )}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>End Date</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => setShowEndDatePicker(true)}
+              >
+                <Text>{formatDate(selectedEndDate)}</Text>
+              </TouchableOpacity>
+              {showEndDatePicker && (
+                <DateTimePicker
+                  value={selectedEndDate}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  onChange={(event, selectedDate) => {
+                    setShowEndDatePicker(false)
+                    if (selectedDate) {
+                      setSelectedEndDate(selectedDate)
+                    }
+                  }}
+                />
+              )}
+            </View>
+
+            <View style={styles.amountSection}>
+              <View style={styles.amountRow}>
+                <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
+                  <Text style={styles.amountLabel}>Room Rent</Text>
+                  <Text style={styles.amountValue}>₹{seatRent}</Text>
+                </View>
+
+                <View style={[styles.inputGroup, styles.flex1]}>
+                  <Text style={styles.amountLabel}>Discount</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="00"
+                    keyboardType="numeric"
+                    value={discount}
+                    onChangeText={setDiscount}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.amountRow}>
+                <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
+                  <Text style={styles.amountLabel}>Paid Amount *</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="0.00"
+                    keyboardType="numeric"
+                    value={paidAmount}
+                    onChangeText={setPaidAmount}
+                  />
+                </View>
+
+                <View style={[styles.inputGroup, styles.flex1]}>
+                  <Text style={[styles.amountLabel, styles.dueAmount]}>Due Amount</Text>
+                  <Text style={[styles.amountValue, styles.dueAmount]}>
+                    ₹{seatRent - (Number(paidAmount) || 0) - (Number(discount) || 0)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <Text style={styles.requiredField}>* Required fields</Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowRentModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleAddRent}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Add Rent</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rent Details */}
       <View style={styles.card}>
-        <Text style={styles.planName}>{member.plan}</Text>
+        <Text style={styles.planName}>Latest Rent Payment</Text>
         <View style={styles.planGrid}>
           <View style={styles.planColumn}>
             <Text style={styles.planLabel}>Start Date</Text>
-            <Text style={styles.planValue}>{member.addmissionDate.toDateString()}</Text>
-            <Text style={styles.planLabel}>Plan Amount</Text>
-            <Text style={styles.planValue}>{member.totalAmount}</Text>
-            <Text style={styles.planLabel}>Final Amount</Text>
-            <Text style={styles.planValue}>{member.totalAmount}</Text>
+            <Text style={styles.planValue}>{latestRent?.startDate || "Not Available"}</Text>
             <Text style={styles.planLabel}>Paid Amount</Text>
-            <Text style={styles.planValue}>{member.paidAmount}</Text>
+            <Text style={styles.planValue}>₹{latestRent?.paidAmount || "0"}</Text>
+            <Text style={styles.planLabel}>Payment Date</Text>
+            <Text style={styles.planValue}>{latestRent?.paymentDate.toLocaleDateString() || "Not Available"}</Text>
           </View>
           <View style={styles.planColumn}>
             <Text style={styles.planLabel}>End Date</Text>
-            <Text style={styles.planValue}>{member.expiryDate.toDateString()}</Text>
+            <Text style={styles.planValue}>{latestRent?.endDate || "Not Available"}</Text>
             <Text style={styles.planLabel}>Discount</Text>
-            <Text style={styles.planValue}>{member.discount || "00"}</Text>
-            <Text style={styles.planLabel}>Advance Amount</Text>
-            <Text style={styles.planValue}>{member.advanceAmount || "00"}</Text>
+            <Text style={styles.planValue}>₹{latestRent?.discount || "0"}</Text>
             <Text style={[styles.planLabel, styles.dueAmount]}>Due Amount</Text>
-            <Text style={[styles.planValue, styles.dueAmount]}>{member.dueAmount}</Text>
+            <Text style={[styles.planValue, styles.dueAmount]}>₹{latestRent?.dueAmount || "0"}</Text>
           </View>
         </View>
       </View>
@@ -488,19 +731,29 @@ const MemberDetails: React.FC = () => {
       <View style={styles.card}>
         <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={styles.tableHeaderCell}>Bill Date</Text>
+            <Text style={styles.tableHeaderCell}>Payment Date</Text>
             <Text style={styles.tableHeaderCell}>Invoice No.</Text>
-            <Text style={styles.tableHeaderCell}>Paid Amount</Text>
+            <Text style={styles.tableHeaderCell}>Period</Text>
+            <Text style={styles.tableHeaderCell}>Amount</Text>
             <Text style={styles.tableHeaderCell}>Print Bill</Text>
           </View>
-          <View style={styles.tableRow}>
-            <Text style={styles.tableCell}>{member.addmissionDate.toDateString()}</Text>
-            <Text style={styles.tableCell}>INV1</Text>
-            <Text style={styles.tableCell}>{member.paidAmount}</Text>
-            <TouchableOpacity onPress={handlePrintInvoice}>
-              <Text style={[styles.tableCell, styles.printButton]}>Print</Text>
-            </TouchableOpacity>
-          </View> 
+          {rentHistory.length > 0 ? (
+            rentHistory.map((rent) => (
+              <View key={rent.id} style={styles.tableRow}>
+                <Text style={styles.tableCell}>{rent.paymentDate.toLocaleDateString()}</Text>
+                <Text style={styles.tableCell}>RENT-{rent.id.slice(-6)}</Text>
+                <Text style={styles.tableCell}>{rent.startDate} - {rent.endDate}</Text>
+                <Text style={styles.tableCell}>₹{rent.paidAmount}</Text>
+                <TouchableOpacity onPress={() => handlePrintInvoice(rent)}>
+                  <Text style={[styles.tableCell, styles.printButton]}>Print</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          ) : (
+            <View style={styles.tableRow}>
+              <Text style={[styles.tableCell, styles.noDataText]}>No rent payments found</Text>
+            </View>
+          )}
         </View>
       </View>
       <Modal
@@ -547,138 +800,6 @@ const MemberDetails: React.FC = () => {
         onSend={handleSendWhatsAppMessage}
         contactNumber={member?.contactNumber || ""}
       />
-      <Modal
-        visible={showPlanPicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowPlanPicker(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Extend Plan</Text>
-            
-            {/* Plan Selection */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Select Plan</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedPlan}
-                  onValueChange={(itemValue: string, itemIndex: number) => {
-                    setSelectedPlan(itemValue)
-                    setSelectedPlanId(plans[itemIndex - 1]?.id || "")
-                  }}
-                  style={styles.picker}
-                >
-                  <Picker.Item label="Select Plan" value="" />
-                  {plans.map((plan) => (
-                    <Picker.Item key={plan.id} label={plan.name} value={plan.name} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-
-            {/* Amount Section */}
-            <View style={styles.amountSection}>
-              <View style={styles.amountRow}>
-                <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
-                  <Text style={styles.amountLabel}>Plan Amount</Text>
-                  <TextInput
-                    style={styles.amountInput}
-                    placeholder="0.00"
-                    keyboardType="numeric"
-                    editable={false}
-                    value={selectedPlanId ? plans.find(p => p.id === selectedPlanId)?.amount || "0" : "0"}
-                  />
-                </View>
-
-                <View style={[styles.inputGroup, styles.flex1]}>
-                  <Text style={styles.amountLabel}>Discount</Text>
-                  <TextInput
-                    style={styles.amountInput}
-                    placeholder="00"
-                    keyboardType="numeric"
-                    value={discount}
-                    onChangeText={(value) => setDiscount(value)}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.amountRow}>
-                <View style={[styles.inputGroup, styles.flex1]}>
-                  <Text style={styles.amountLabel}>Paid Amount</Text>
-                  <TextInput
-                    style={styles.amountInput}
-                    placeholder="00"
-                    keyboardType="numeric"
-                    value={paidAmount}
-                    onChangeText={(value) => setPaidAmount(value)}
-                  />
-                </View>
-
-                <View style={[styles.inputGroup, styles.flex1]}>
-                  <Text style={[styles.amountLabel, styles.dueAmount]}>Due Amount</Text>
-                  <TextInput
-                    style={[styles.amountInput, styles.dueAmount]}
-                    placeholder="00"
-                    keyboardType="numeric"
-                    editable={false}
-                    value={(
-                      Number(selectedPlanId ? plans.find(p => p.id === selectedPlanId)?.amount || "0" : "0") -
-                      Number(discount || "0") -
-                      Number(paidAmount || "0")
-                    ).toString()}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Expiry Date Selection */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>New Expiry Date</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text>{newExpiryDate.toLocaleDateString()}</Text>
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={newExpiryDate}
-                  mode="date"
-                  display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={(event, selectedDate) => {
-                    setShowDatePicker(false)
-                    if (selectedDate) {
-                      setNewExpiryDate(selectedDate)
-                    }
-                  }}
-                />
-              )}
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowPlanPicker(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleExtendPlan}
-                disabled={isExtending}
-              >
-                {isExtending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.confirmButtonText}>Extend Plan</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
       <Toast />
     </ScrollView>
   )
@@ -792,7 +913,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   noDataText: {
-    color: "#666",
+    flex: 5,
     fontStyle: "italic",
   },
   documentImage: {
@@ -942,6 +1063,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: "#fff",
+    marginTop: 4,
   },
   modalButtons: {
     flexDirection: "row",
@@ -1053,6 +1175,31 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: "#fff",
+    fontSize: 16,
+  },
+  requiredField: {
+    color: '#666',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: -10,
+    marginBottom: 10,
+  },
+  amountValue: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#333",
+    padding: 12,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
   },
 })
 

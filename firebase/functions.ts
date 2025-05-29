@@ -191,16 +191,12 @@ export async function addMember({currentUser, libraryId, data}: {currentUser: Us
       contactNumber: data?.contactNumber,
       email: data?.email,
       addmissionDate: data?.admissionDate,
-      expiryDate: data?.expiryDate,
+     
       profileImage: data?.profileImage,
-      document: data?.document,
-      dueAmount: data?.dueAmount,
-      totalAmount: data?.totalAmount,
-      paidAmount: data?.paidAmount,
-      discount: data?.discount,
+      document: data?.document, 
       advanceAmount: data?.advanceAmount,
-      planIds: [data?.planId], // Changed to array to store multiple plan IDs
-      plan: data?.plan,
+      profession: data?.profession,
+
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -336,27 +332,10 @@ export async function getMemberById({ id }: { id: string }) {
     }
     
     const memberData = memberSnapshot.data()
-    const planIds = memberData.planIds || []
+
     
-    // Get the latest plan ID (last one in the array)
-    const latestPlanId = planIds[planIds.length - 1]
-    let latestPlan = null
-    
-    if (latestPlanId) {
-      const planRef = doc(db, 'plans', latestPlanId)
-      const planSnapshot = await getDoc(planRef)
-      if (planSnapshot.exists()) {
-        const planData = planSnapshot.data()
-        latestPlan = {
-          id: latestPlanId,
-          name: planData.name,
-          description: planData.description,
-          duration: planData.duration,
-          amount: planData.amount
-        }
-      }
-    }
-    
+  
+  
     return { 
       id: memberSnapshot.id, 
       fullName: memberData.fullName,
@@ -364,19 +343,10 @@ export async function getMemberById({ id }: { id: string }) {
       contactNumber: memberData.contactNumber,
       email: memberData.email,
       addmissionDate: memberData.addmissionDate.toDate(),
-      expiryDate: memberData.expiryDate.toDate(),
-      status: memberData.status,
-      seatNumber: memberData.seatNumber,
       profileImage: memberData.profileImage,
       document: memberData.document,
-      dueAmount: memberData.dueAmount,
-      totalAmount: memberData.totalAmount,
-      paidAmount: memberData.paidAmount,
-      discount: memberData.discount,
       advanceAmount: memberData.advanceAmount,
-      planId: latestPlanId,
-      plan: latestPlan ? latestPlan.name : memberData.plan,
-      latestPlan: latestPlan,
+      profession: memberData.profession,
       createdAt: memberData.createdAt,
       updatedAt: memberData.updatedAt
     }
@@ -401,108 +371,7 @@ export async function totalMemberCount({ currentUser, libraryId }: { currentUser
   }
 }
 
-export async function liveMemberCount({ currentUser, libraryId }: { currentUser: any, libraryId: string }) {
-  try {
-    // const currentUser = getAuth().currentUser
-    if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...")
-    }
-    const q = query(
-      collection(db, "members"), 
-      where("admin", "==", currentUser.uid), 
-      where("expiryDate", ">=", new Date()),
-      where("libraryId", "==", libraryId)
-    )
-    const membersSnapshot = await getDocs(q)
-    return membersSnapshot.size
-  } catch (error: any) {
-    console.error("Unable to get live member count:", error.message)
-    throw error
-  }
-}
 
-export async function InactiveMemberCount({ currentUser, libraryId }: { currentUser: any, libraryId: string }) {
-  try {
-    // const currentUser = getAuth().currentUser
-    if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...")
-    }
-    const q = query(
-      collection(db, "members"), 
-      where("admin", "==", currentUser.uid),
-      where("libraryId", "==", libraryId),
-       where("expiryDate", "<", new Date())
-      )
-    const membersSnapshot = await getDocs(q)
-    return membersSnapshot.size
-  } catch (error: any) {
-    console.error("Unable to get inactive member count:", error.message)
-    throw error
-  }
-}
-
-export async function paidAmountCount({ currentUser, libraryId }: { currentUser: any, libraryId: string }) {
-  try {
-    // const currentUser = getAuth().currentUser;
-    if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...");
-    }
-
-    // Query to get all members with status "Live" under the current admin
-    const q = query(
-      collection(db, "members"),
-      where("admin", "==", currentUser.uid),
-      where("libraryId", "==", libraryId)
-    );
-    const membersSnapshot = await getDocs(q);
-
-    // Calculate the total paid amount
-    const paidAmount = membersSnapshot.docs
-      .map((doc) => Number(doc.data().paidAmount) || 0) // Convert string to number and default to 0 if invalid
-      .reduce((acc, amount) => acc + amount, 0); // Sum all amounts
-
-    return paidAmount;
-  } catch (error: any) {
-    console.error("Unable to get paid amount count:", error.message)
-    throw error
-  }
-}
-
-export async function totalAmountCount({ currentUser, libraryId }: { currentUser: any, libraryId: string }) {
-  try {
-    // const currentUser = getAuth().currentUser
-    if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...")
-    }
-    const q = query(collection(db, "members"), where("admin", "==", currentUser.uid), where("libraryId", "==", libraryId))
-    const membersSnapshot = await getDocs(q)
-    const totalAmount = membersSnapshot.docs
-      .map((doc) => Number(doc.data().totalAmount) || 0) // Convert string to number and default to 0 if invalid
-      .reduce((acc, amount) => acc + amount, 0)
-    return totalAmount
-  } catch (error: any) {
-    console.error("Unable to get total amount count:", error.message)
-    throw error
-  }
-}
-
-export async function dueAmountCount({ currentUser, libraryId }: { currentUser: any, libraryId: string }) {
-  try {
-    // const currentUser = getAuth().currentUser
-    if (!currentUser) {
-      throw new Error("User not authenticated. Redirecting to sign-in...")
-    }
-    const q = query(collection(db, "members"), where("admin", "==", currentUser.uid), where("libraryId", "==", libraryId))
-    const membersSnapshot = await getDocs(q)
-    const dueAmount = membersSnapshot.docs
-      .map((doc) => Number(doc.data().dueAmount) || 0) // Convert string to number and default to 0 if invalid
-      .reduce((acc, amount) => acc + amount, 0)
-    return dueAmount
-  } catch (error: any) {
-    console.error("Unable to get due amount count:", error.message)
-    throw error
-  }
-}
 
 export const saveAttendance = async ({ currentUser, attendanceData, libraryId }: { currentUser: any, attendanceData: { date: string; members: { id: string; fullName: string; isPresent: boolean }[] }, libraryId: string }) => {
   try {
@@ -662,7 +531,7 @@ export const deleteSeat = async (seatId: string) => {
   }
 }
 
-export const allotSeat = async (seatId: string, memberId: string, memberName: string, expiryDate: Date) => {
+export const allotSeat = async (seatId: string, memberId: string, memberName: string, ) => {
   try {
     const currentUser = getAuth().currentUser;
     if (!currentUser) {
@@ -697,10 +566,7 @@ export const allotSeat = async (seatId: string, memberId: string, memberName: st
       throw new Error("This member already has an allocated seat.");
     }
 
-    // Validate expiry date
-    if (expiryDate < new Date()) {
-      throw new Error("Member's subscription has expired. Please renew the subscription first.");
-    }
+   
 
     // Update seat allocation
     await updateDoc(seatDoc, {
@@ -708,7 +574,7 @@ export const allotSeat = async (seatId: string, memberId: string, memberName: st
       allocatedTo: memberId,
       memberId: memberId, // Store member ID for easy reference
       memberName: memberName,
-      memberExpiryDate: expiryDate,
+      
       lastUpdated: new Date(),
       updatedBy: currentUser.uid
     });
@@ -732,7 +598,7 @@ export const allotSeat = async (seatId: string, memberId: string, memberName: st
         roomType: seat.roomType,
         memberName,
         memberId,
-        expiryDate
+        
       }
     };
   } catch (error: any) {

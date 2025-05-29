@@ -11,17 +11,12 @@ export const useAddMemberForm = () => {
       address: "",
       contactNumber: "",
       email: "",
-      plan: "",
-      totalAmount: "",
-      paidAmount: "",
-      dueAmount: "",
-      discount: "",
+     
       advanceAmount: "",
       profileImage: "",
       document: "",
       admissionDate: new Date(),
-      expiryDate: new Date(),
-      planId: "",
+      profession: "",
     },
   })
 
@@ -42,35 +37,7 @@ export const useAddMemberForm = () => {
     fetchPlans()
   }, [])
 
-  useEffect(() => {
-    const planId = watch("planId")
-    if (planId) {
-      const fetchPlan = async () => {
-        const planData = await getPlanById({ id: planId })
-        setSelectedPlan(planData)
-        setValue("totalAmount", planData.amount)
-      }
-      fetchPlan()
-    }
-  }, [watch("planId"), setValue]) // Added setValue to dependencies
 
-  useEffect(() => {
-    const paidAmount = Number.parseFloat(watch("paidAmount")) || 0
-    const totalAmount = Number.parseFloat(watch("totalAmount")) || 0
-    const discount = Number.parseFloat(watch("discount")) || 0
-    const dueAmount = totalAmount - paidAmount - discount
-    setValue("dueAmount", dueAmount.toFixed(2))
-  }, [watch("paidAmount"), watch("totalAmount"), watch("discount"), setValue]) // Added setValue to dependencies
-
-  useEffect(() => {
-    const admissionDate = watch("admissionDate")
-    const planDuration = selectedPlan ? Number.parseInt(selectedPlan.duration) : 0
-    if (admissionDate && planDuration) {
-      const expiryDate = new Date(admissionDate)
-      expiryDate.setDate(expiryDate.getDate() + planDuration)
-      setValue("expiryDate", expiryDate)
-    }
-  }, [watch("admissionDate"), selectedPlan, setValue]) // Added setValue to dependencies
 
   return {
     control,

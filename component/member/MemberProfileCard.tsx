@@ -9,58 +9,146 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native";
-import { getMembers, totalMemberCount, liveMemberCount, InactiveMemberCount } from "@/firebase/functions";
+import { getMembers, totalMemberCount,  } from "@/firebase/functions";
 import type { MemberDetails } from "@/types/MemberProfile";
 import MemberCard from "./MemberCard";
 import { useRouter } from "expo-router";
-import { DocumentData, QueryDocumentSnapshot } from "@firebase/firestore";
+import { DocumentData, QueryDocumentSnapshot, collection, query, where, getDocs, orderBy, limit } from "@firebase/firestore";
 import useStore from "@/hooks/store";
+import { db } from "@/utils/firebaseConfig";
+
+interface RentDetails {
+  startDate: string;
+  endDate: string;
+  paidAmount: number;
+  dueAmount: number;
+  paymentDate: Date;
+}
+
+interface MemberWithRent extends MemberDetails {
+  latestRent?: RentDetails;
+}
 
 const MemberProfileCards: React.FC = () => {
-  const [members, setMembers] = useState<MemberDetails[]>([]);
-  const [filteredMembers, setFilteredMembers] = useState<MemberDetails[]>([]);
+  const [members, setMembers] = useState<MemberWithRent[]>([]);
+  const [filteredMembers, setFilteredMembers] = useState<MemberWithRent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData, DocumentData>>();
   const [hasMore, setHasMore] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<"all" | "live" | "expired" | "expiringSoon">("all");
-  const [totalMembers, setTotalMembers] = useState(0); // Total members count
-  const [liveMembersCount, setLiveMembersCount] = useState(0); // Live members count
-  const [expiredMembersCount, setExpiredMembersCount] = useState(0); // Expired members count
-  const [expiringSoonCount, setExpiringSoonCount] = useState(0); // Expiring soon count
+  const [activeFilter, setActiveFilter] = useState<"all" | "activePaid" | "activePending" | "expired">("all");
+  const [totalMembers, setTotalMembers] = useState(0);
+  const [activePaidCount, setActivePaidCount] = useState(0);
+  const [activePendingCount, setActivePendingCount] = useState(0);
+  const [expiredCount, setExpiredCount] = useState(0);
   const router = useRouter();
 
   const currentUser = useStore((state: any) => state.currentUser);
   const activeLibrary = useStore((state: any) => state.activeLibrary);
 
- 
-  // Helper function to calculate days difference
-  const getDaysDifference = (expiryDate: Date): number => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today's date to midnight
-    const timeDiff = expiryDate.getTime() - today.getTime();
-    return Math.ceil(timeDiff / (1000 * 3600 * 24)); // Convert time difference to days
+  // Fetch latest rent for a member
+  const fetchLatestRent = async (memberId: string): Promise<RentDetails | undefined> => {
+    try {
+      const rentRef = collection(db, `tenants/${memberId}/rentPayments`);
+      const q = query(rentRef, orderBy("paymentDate", "desc"), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const rentDoc = querySnapshot.docs[0];
+        return {
+          startDate: rentDoc.data().startDate,
+          endDate: rentDoc.data().endDate,
+          paidAmount: rentDoc.data().paidAmount,
+          dueAmount: rentDoc.data().dueAmount,
+          paymentDate: rentDoc.data().paymentDate.toDate()
+        };
+      }
+      return undefined;
+    } catch (error) {
+      console.error("Error fetching latest rent:", error);
+      return undefined;
+    }
   };
 
-  // Fetch initial members and total counts
+  // Calculate member counts based on rent status
+  const calculateMemberCounts = async (): Promise<{
+    activePaid: number;
+    activePending: number;
+    expired: number;
+  }> => {
+    try {
+      const { members: allMembers } = await getMembers({
+        pageSize: 1000,
+        lastVisible: undefined,
+        currentUser,
+        libraryId: activeLibrary.id
+      });
+
+      const today = new Date();
+      let activePaid = 0;
+      let activePending = 0;
+      let expired = 0;
+
+      for (const member of allMembers) {
+        const latestRent = await fetchLatestRent(member.id);
+        
+        if (!latestRent) {
+          expired++; // No rent payment means expired
+          continue;
+        }
+
+        const endDate = new Date(latestRent.endDate);
+        const isActive = endDate > today;
+        const isPaid = latestRent.dueAmount === 0;
+
+        if (!isActive) {
+          expired++;
+        } else {
+          if (isPaid) {
+            activePaid++;
+          } else {
+            activePending++;
+          }
+        }
+      }
+
+      return { activePaid, activePending, expired };
+    } catch (error) {
+      console.error("Error calculating member counts:", error);
+      return { activePaid: 0, activePending: 0, expired: 0 };
+    }
+  };
+
+  // Update fetchInitialData to use new counts
   const fetchInitialData = async () => {
     setIsLoading(true);
     try {
-      // Fetch total counts
       const total = await totalMemberCount({ currentUser, libraryId: activeLibrary.id });
-      const live = await liveMemberCount({ currentUser, libraryId: activeLibrary.id });
-      const expired = await InactiveMemberCount({ currentUser, libraryId: activeLibrary.id });
-      const expiringSoon = await calculateExpiringSoonCount();
+      const { activePaid, activePending, expired } = await calculateMemberCounts();
 
       setTotalMembers(total);
-      setLiveMembersCount(live);
-      setExpiredMembersCount(expired);
-      setExpiringSoonCount(expiringSoon);
+      setActivePaidCount(activePaid);
+      setActivePendingCount(activePending);
+      setExpiredCount(expired);
 
       // Fetch initial members
-      const { members: newMembers, lastVisibleDoc, hasMore: more } = await getMembers({pageSize: 10, lastVisible, currentUser, libraryId: activeLibrary.id});
-      setMembers(newMembers);
-      setFilteredMembers(newMembers);
+      const { members: newMembers, lastVisibleDoc, hasMore: more } = await getMembers({
+        pageSize: 10,
+        lastVisible,
+        currentUser,
+        libraryId: activeLibrary.id
+      });
+
+      // Fetch latest rent for each member
+      const membersWithRent = await Promise.all(
+        newMembers.map(async (member) => ({
+          ...member,
+          latestRent: await fetchLatestRent(member.id)
+        }))
+      );
+
+      setMembers(membersWithRent);
+      setFilteredMembers(membersWithRent);
       setLastVisible(lastVisibleDoc);
       setHasMore(more);
     } catch (error) {
@@ -70,25 +158,28 @@ const MemberProfileCards: React.FC = () => {
     }
   };
 
-  // Calculate expiring soon count
-  const calculateExpiringSoonCount = async (): Promise<number> => {
-    // Fetch all members (or use a Firestore query to count expiring soon members directly)
-    const { members: allMembers } = await getMembers({pageSize: 10, lastVisible, currentUser, libraryId: activeLibrary.id});
-    return allMembers.filter((member) => {
-      const expiryDate = new Date(member.expiryDate);
-      const daysDiff = getDaysDifference(expiryDate);
-      return daysDiff >= 2 && daysDiff <= 3;
-    }).length;
-  };
-
   // Fetch more members when scrolling
   const fetchMoreMembers = async () => {
     if (isLoadingMore || !hasMore) return;
     setIsLoadingMore(true);
     try {
-      const { members: newMembers, lastVisibleDoc, hasMore: more } = await getMembers({pageSize: 10, lastVisible, currentUser, libraryId: activeLibrary.id});
-      setMembers((prev) => [...prev, ...newMembers]);
-      setFilteredMembers((prev) => [...prev, ...newMembers]);
+      const { members: newMembers, lastVisibleDoc, hasMore: more } = await getMembers({
+        pageSize: 10,
+        lastVisible,
+        currentUser,
+        libraryId: activeLibrary.id
+      });
+
+      // Fetch latest rent for new members
+      const membersWithRent = await Promise.all(
+        newMembers.map(async (member) => ({
+          ...member,
+          latestRent: await fetchLatestRent(member.id)
+        }))
+      );
+
+      setMembers((prev) => [...prev, ...membersWithRent]);
+      setFilteredMembers((prev) => [...prev, ...membersWithRent]);
       setLastVisible(lastVisibleDoc);
       setHasMore(more);
     } catch (error) {
@@ -98,31 +189,35 @@ const MemberProfileCards: React.FC = () => {
     }
   };
 
-  // Apply filters
-  const applyFilter = (filter: "all" | "live" | "expired" | "expiringSoon") => {
+  // Update applyFilter to use new rent-based categories
+  const applyFilter = (filter: "all" | "activePaid" | "activePending" | "expired") => {
     setActiveFilter(filter);
+    const today = new Date();
+    
     switch (filter) {
-      case "live":
-        const liveMembers = members.filter((member) => {
-          const expiryDate = new Date(member.expiryDate);
-          return expiryDate > new Date();
+      case "activePaid":
+        const activePaidMembers = members.filter((member) => {
+          if (!member.latestRent) return false;
+          const endDate = new Date(member.latestRent.endDate);
+          return endDate > today && member.latestRent.dueAmount === 0;
         });
-        setFilteredMembers(liveMembers);
+        setFilteredMembers(activePaidMembers);
+        break;
+      case "activePending":
+        const activePendingMembers = members.filter((member) => {
+          if (!member.latestRent) return false;
+          const endDate = new Date(member.latestRent.endDate);
+          return endDate > today && member.latestRent.dueAmount > 0;
+        });
+        setFilteredMembers(activePendingMembers);
         break;
       case "expired":
         const expiredMembers = members.filter((member) => {
-          const expiryDate = new Date(member.expiryDate);
-          return expiryDate <= new Date();
+          if (!member.latestRent) return true;
+          const endDate = new Date(member.latestRent.endDate);
+          return endDate <= today;
         });
         setFilteredMembers(expiredMembers);
-        break;
-      case "expiringSoon":
-        const expiringSoonMembers = members.filter((member) => {
-          const expiryDate = new Date(member.expiryDate);
-          const daysDiff = getDaysDifference(expiryDate);
-          return daysDiff >= 2 && daysDiff <= 3;
-        });
-        setFilteredMembers(expiringSoonMembers);
         break;
       default:
         setFilteredMembers(members);
@@ -140,8 +235,12 @@ const MemberProfileCards: React.FC = () => {
   };
 
   // Render member card
-  const renderItem = ({ item }: { item: MemberDetails }) => (
-    <MemberCard member={item} onPress={() => handleMemberClick(item.id)} />
+  const renderItem = ({ item }: { item: MemberWithRent }) => (
+    <MemberCard 
+      member={item} 
+      onPress={() => handleMemberClick(item.id)}
+      rentDetails={item.latestRent}
+    />
   );
 
   return (
@@ -160,22 +259,22 @@ const MemberProfileCards: React.FC = () => {
             <Text style={styles.filterText}>All ({totalMembers})</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.filterButton, activeFilter === "live" && styles.activeFilter]}
-            onPress={() => applyFilter("live")}
+            style={[styles.filterButton, activeFilter === "activePaid" && styles.activeFilter]}
+            onPress={() => applyFilter("activePaid")}
           >
-            <Text style={styles.filterText}>Live ({liveMembersCount})</Text>
+            <Text style={styles.filterText}>Active & Paid ({activePaidCount})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, activeFilter === "activePending" && styles.activeFilter]}
+            onPress={() => applyFilter("activePending")}
+          >
+            <Text style={styles.filterText}>Active & Pending ({activePendingCount})</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.filterButton, activeFilter === "expired" && styles.activeFilter]}
             onPress={() => applyFilter("expired")}
           >
-            <Text style={styles.filterText}>Expired ({expiredMembersCount})</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterButton, activeFilter === "expiringSoon" && styles.activeFilter]}
-            onPress={() => applyFilter("expiringSoon")}
-          >
-            <Text style={styles.filterText}>Expiring Soon ({expiringSoonCount})</Text>
+            <Text style={styles.filterText}>Expired ({expiredCount})</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>

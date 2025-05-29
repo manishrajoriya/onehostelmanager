@@ -20,7 +20,6 @@ import useStore from "@/hooks/store";
 interface Member {
   id: string;
   fullName: string;
-  expiryDate: any; // Firestore Timestamp or Date
   allocatedSeatId?: string;
   phoneNumber?: string;
   email?: string;
@@ -112,11 +111,11 @@ const AllocateSeatsPage: React.FC = () => {
     }
   };
 
-  const isMemberExpired = useCallback((expiryDate: any) => {
-    if (!expiryDate) return true;
-    const milliseconds = expiryDate.seconds * 1000 + Math.floor(expiryDate.nanoseconds / 1e6);
-    return new Date(milliseconds) < new Date();
-  }, []);
+  // const isMemberExpired = useCallback((expiryDate: any) => {
+  //   if (!expiryDate) return true;
+  //   const milliseconds = expiryDate.seconds * 1000 + Math.floor(expiryDate.nanoseconds / 1e6);
+  //   return new Date(milliseconds) < new Date();
+  // }, []);
 
   const loadMembers = useCallback(async () => {
     if (!hasMoreMembers || loading) return;
@@ -138,8 +137,7 @@ const AllocateSeatsPage: React.FC = () => {
       // Filter out duplicates and expired members
       const newMembers = fetchedMembers.filter(
         (newMember) => 
-          !prevMembers.some((existingMember) => existingMember.id === newMember.id) &&
-          !isMemberExpired(newMember.expiryDate)
+          !prevMembers.some((existingMember) => existingMember.id === newMember.id) 
       );
       return [...prevMembers, ...newMembers];
     });
@@ -152,7 +150,7 @@ const AllocateSeatsPage: React.FC = () => {
   } finally {
     setLoading(false);
   }
-}, [lastVisibleDoc, hasMoreMembers, loading, currentUser, activeLibrary.id, isMemberExpired]);
+}, [lastVisibleDoc, hasMoreMembers, loading, currentUser, activeLibrary.id, ]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -177,7 +175,7 @@ const AllocateSeatsPage: React.FC = () => {
         selectedSeat,
         selectedMember.id,
         selectedMember.fullName,
-        selectedMember.expiryDate
+        
       );
 
       if (result.success) {
@@ -507,12 +505,7 @@ const AllocateSeatsPage: React.FC = () => {
                           <Text style={styles.memberDetailValue}>{selectedMemberDetails.address}</Text>
                         </View>
                       )}
-                      <View style={styles.memberDetailRow}>
-                        <Text style={styles.memberDetailLabel}>Expiry Date:</Text>
-                        <Text style={styles.memberDetailValue}>
-                          {formatDate(selectedMemberDetails.expiryDate)}
-                        </Text>
-                      </View>
+                    
                       {selectedMemberDetails.joiningDate && (
                         <View style={styles.memberDetailRow}>
                           <Text style={styles.memberDetailLabel}>Joining Date:</Text>

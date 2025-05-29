@@ -17,7 +17,8 @@ import {
   FieldValue,
   serverTimestamp,
   type DocumentReference,
-  setDoc
+  setDoc,
+  Timestamp
 } from "firebase/firestore"; 
 import { db } from "@/utils/firebaseConfig";
 
@@ -493,6 +494,37 @@ export async function getAllMembers(params: {
   return allMembers;
 }
 
+
+export const addMonthlyRent = async ({
+  memberId,
+  startDate,
+  endDate,
+  paidAmount,
+  dueAmount,
+  discount = 0,
+}: {
+  memberId: string;
+  startDate: string; // e.g., "May 2025"
+  endDate: string; // e.g., "May 2025"
+  paidAmount: number;
+  dueAmount: number;
+  discount?: number;
+}) => {
+  try {
+    const rentRef = collection(db, `tenants/${memberId}/rentPayments`);
+    await addDoc(rentRef, {
+      startDate,
+      endDate,
+      paidAmount,
+      dueAmount,
+      discount,
+      paymentDate: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error("Error adding rent payment:", error);
+    throw error;
+  }
+};
 
 
 

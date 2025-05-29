@@ -65,19 +65,13 @@ export interface FormData {
   address: string;
   contactNumber: string;
   email: string;
-  plan: string;
-  totalAmount: string;
-  paidAmount: string;
-  dueAmount: string;
-  discount: string;
+
   advanceAmount: string;
   profileImage: string;
   document: string;
   admissionDate: Date;
-  expiryDate: Date;
-  status: string;
-  seatNumber: string;
-  planId: string;
+ profession: string
+
 }
 
 export interface PlanData {
