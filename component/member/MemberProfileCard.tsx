@@ -55,12 +55,13 @@ const MemberProfileCards: React.FC = () => {
       
       if (!querySnapshot.empty) {
         const rentDoc = querySnapshot.docs[0];
+        const data = rentDoc.data();
         return {
-          startDate: rentDoc.data().startDate,
-          endDate: rentDoc.data().endDate,
-          paidAmount: rentDoc.data().paidAmount,
-          dueAmount: rentDoc.data().dueAmount,
-          paymentDate: rentDoc.data().paymentDate.toDate()
+          startDate: data.startDate,
+          endDate: data.endDate,
+          paidAmount: data.paidAmount,
+          dueAmount: data.dueAmount,
+          paymentDate: data.paymentDate || new Date()
         };
       }
       return undefined;
@@ -97,7 +98,8 @@ const MemberProfileCards: React.FC = () => {
           continue;
         }
 
-        const endDate = new Date(latestRent.endDate);
+        const [day, month, year] = latestRent.endDate.split('/').map(Number);
+        const endDate = new Date(year, month - 1, day);
         const isActive = endDate > today;
         const isPaid = latestRent.dueAmount === 0;
 
@@ -152,7 +154,7 @@ const MemberProfileCards: React.FC = () => {
       setLastVisible(lastVisibleDoc);
       setHasMore(more);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching data in fetchInitialData:", error);
     } finally {
       setIsLoading(false);
     }
@@ -198,7 +200,8 @@ const MemberProfileCards: React.FC = () => {
       case "activePaid":
         const activePaidMembers = members.filter((member) => {
           if (!member.latestRent) return false;
-          const endDate = new Date(member.latestRent.endDate);
+          const [day, month, year] = member.latestRent.endDate.split('/').map(Number);
+          const endDate = new Date(year, month - 1, day);
           return endDate > today && member.latestRent.dueAmount === 0;
         });
         setFilteredMembers(activePaidMembers);
@@ -206,7 +209,8 @@ const MemberProfileCards: React.FC = () => {
       case "activePending":
         const activePendingMembers = members.filter((member) => {
           if (!member.latestRent) return false;
-          const endDate = new Date(member.latestRent.endDate);
+          const [day, month, year] = member.latestRent.endDate.split('/').map(Number);
+          const endDate = new Date(year, month - 1, day);
           return endDate > today && member.latestRent.dueAmount > 0;
         });
         setFilteredMembers(activePendingMembers);
@@ -214,7 +218,8 @@ const MemberProfileCards: React.FC = () => {
       case "expired":
         const expiredMembers = members.filter((member) => {
           if (!member.latestRent) return true;
-          const endDate = new Date(member.latestRent.endDate);
+          const [day, month, year] = member.latestRent.endDate.split('/').map(Number);
+          const endDate = new Date(year, month - 1, day);
           return endDate <= today;
         });
         setFilteredMembers(expiredMembers);

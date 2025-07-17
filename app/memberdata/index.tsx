@@ -18,7 +18,7 @@ import {
 import { Picker } from "@react-native-picker/picker";
 import { useRouter, useLocalSearchParams } from "expo-router"
 import { AntDesign, MaterialIcons } from "@expo/vector-icons"
-import { getMemberById, fetchSeatByMemberId, fetchAttendanceByMemberId, deleteMember, getMemberPlanHistory, extendMemberPlan, getPlans, fetchSeats } from "@/firebase/functions"
+import { getMemberById, fetchAttendanceByMemberId, deleteMember, getMemberPlanHistory, extendMemberPlan, getPlans, fetchSeats } from "@/firebase/functions"
 import { addMonthlyRent } from "@/firebase/hostel"
 import Toast from "react-native-toast-message"
 import WhatsAppModal from "@/component/member/WhatsappMessage"
@@ -79,6 +79,23 @@ interface RentHistory {
   dueAmount: number;
   discount: number;
   paymentDate: Date;
+  previousDueAmount: number;
+  amountAppliedToDue: number;
+  amountAppliedToNewRent: number;
+  totalPaidAmount: number;
+}
+
+interface PaymentDetails {
+  totalPaid: number;
+  previousDueAmount: number;
+  amountAppliedToDue: number;
+  amountAppliedToNewRent: number;
+  remainingDueAmount: number;
+  newDueAmount: number;
+  period: {
+    startDate: string;
+    endDate: string;
+  };
 }
 
 interface InvoiceData {
@@ -132,12 +149,7 @@ const MemberDetails: React.FC = () => {
   const [isWhatsAppModalVisible, setIsWhatsAppModalVisible] = useState(false)
   const [messageTemplates, setMessageTemplates] = useState<string[]>([])
   const [showPlanHistory, setShowPlanHistory] = useState(false)
-  const [showPlanPicker, setShowPlanPicker] = useState(false)
-  const [showDatePicker, setShowDatePicker] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<string>("")
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("")
-  const [newExpiryDate, setNewExpiryDate] = useState<Date>(new Date())
-  const [isExtending, setIsExtending] = useState(false)
+
   const currentUser = useStore((state: any) => state.currentUser)
   const activeLibrary = useStore((state: any) => state.activeLibrary)
   const [discount, setDiscount] = useState<string>("0")
@@ -150,12 +162,16 @@ const MemberDetails: React.FC = () => {
   const [rentHistory, setRentHistory] = useState<RentHistory[]>([])
   const [showStartDatePicker, setShowStartDatePicker] = useState(false)
   const [showEndDatePicker, setShowEndDatePicker] = useState(false)
-  const [selectedStartDate, setSelectedStartDate] = useState(new Date())
+  const [selectedStartDate, setSelectedStartDate] = useState(() => {
+    return new Date(); // Today's date
+  });
+
   const [selectedEndDate, setSelectedEndDate] = useState(() => {
-    const date = new Date()
-    date.setMonth(date.getMonth() + 1)
-    return date
-  })
+    const date = new Date();
+    date.setDate(date.getDate() + 30); // 30 days from today
+    return date;
+  });
+
   const [latestRent, setLatestRent] = useState<RentHistory | null>(null)
   const [seatRent, setSeatRent] = useState<number>(0);
 
@@ -174,7 +190,11 @@ const MemberDetails: React.FC = () => {
         paidAmount: doc.data().paidAmount,
         dueAmount: doc.data().dueAmount,
         discount: doc.data().discount || 0,
-        paymentDate: doc.data().paymentDate.toDate()
+        paymentDate: doc.data().paymentDate.toDate(),
+        previousDueAmount: doc.data().previousDueAmount || 0,
+        amountAppliedToDue: doc.data().amountAppliedToDue || 0,
+        amountAppliedToNewRent: doc.data().amountAppliedToNewRent || 0,
+        totalPaidAmount: doc.data().totalPaidAmount || 0
       }))
       
       setRentHistory(history)
@@ -222,7 +242,7 @@ const MemberDetails: React.FC = () => {
         await fetchSeatRent()
       }
     } catch (error) {
-      console.error("Error fetching member data:", error)
+      console.error("Error fetching member data in MemberDetails:", error)
     } finally {
       setLoading(false)
     }
@@ -333,102 +353,120 @@ const MemberDetails: React.FC = () => {
   }
 
   const handleAddRent = async () => {
-    if (!selectedStartDate || !selectedEndDate) {
-      Toast.show({
-        type: "error",
-        text1: "Please select start and end dates",
-      })
-      return
-    }
-
-    if (!seatRent) {
-      Toast.show({
-        type: "error",
-        text1: "No room rent found for this member",
-      })
-      return
-    }
-
     try {
-      setIsSubmitting(true)
+      if (!memberId) return;
       
-      // Calculate total amount based on seat rent
-      const totalAmount = seatRent;
-      const discountAmount = Number(discount) || 0;
-      const paidAmountValue = Number(paidAmount) || 0;
-
-      // Calculate remaining due amount from previous rent
-      let remainingDue = 0;
-      if (latestRent && latestRent.dueAmount > 0) {
-        remainingDue = latestRent.dueAmount;
+      if (!paidAmount || Number(paidAmount) <= 0) {
+        Toast.show({
+          type: "error",
+          text1: "Please enter a valid paid amount",
+        });
+        return;
       }
 
-      // Calculate total due amount including previous due
-      const totalDueAmount = totalAmount + remainingDue - paidAmountValue - discountAmount;
+      // Format dates for storage
+      const formattedStartDate = selectedStartDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      
+      const formattedEndDate = selectedEndDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      
+      setIsSubmitting(true);
+      
+      const result = await addMonthlyRent({
+        memberId,
+        startDate: formattedStartDate,
+        endDate: formattedEndDate,
+        paidAmount: Number(paidAmount),
+        dueAmount: Number(dueAmount) || 0,
+        discount: Number(discount) || 0,
+      });
 
-      // If paid amount is less than total amount, calculate partial rent
-      let actualPaidAmount = paidAmountValue;
-      let actualDueAmount = totalDueAmount;
+      if (result.success) {
+        const { paymentDetails } = result;
+        
+        // Show payment summary alert
+        Alert.alert(
+          "Payment Summary",
+          `Total Paid: ₹${paymentDetails.totalPaid}
+Previous Due: ₹${paymentDetails.previousDueAmount}
+Amount Applied to Due: ₹${paymentDetails.amountAppliedToDue}
+Amount Applied to New Rent: ₹${paymentDetails.amountAppliedToNewRent}
+Remaining Due: ₹${paymentDetails.remainingDueAmount}
+Period: ${formattedStartDate} - ${formattedEndDate}`,
+          [
+            {
+              text: "Print Invoice",
+              onPress: () => handlePrintInvoice({
+                ...paymentDetails,
+                memberName: member?.fullName,
+                contactNumber: member?.contactNumber,
+                address: member?.address,
+              }),
+            },
+            {
+              text: "OK",
+              style: "cancel",
+            },
+          ]
+        );
 
-      if (paidAmountValue < totalAmount) {
-        // Calculate partial rent based on paid amount
-        const partialRent = Math.floor((paidAmountValue / totalAmount) * 100);
-        const daysInMonth = 30; // Assuming 30 days in a month
-        const partialDays = Math.floor((partialRent / 100) * daysInMonth);
+        // Reset form
+        setPaidAmount("0");
+        setDueAmount("0");
+        setDiscount("0");
+        setShowRentModal(false);
         
-        // Adjust end date based on partial payment
-        const adjustedEndDate = new Date(selectedStartDate);
-        adjustedEndDate.setDate(adjustedEndDate.getDate() + partialDays);
+        // Refresh rent history
+        await fetchRentHistory();
         
-        // Update the end date
-        setSelectedEndDate(adjustedEndDate);
+        Toast.show({
+          type: "success",
+          text1: "Rent payment added successfully",
+        });
       }
-
-      await addMonthlyRent({
-        memberId: member?.id!,
-        startDate: selectedStartDate.toLocaleDateString(),
-        endDate: selectedEndDate.toLocaleDateString(),
-        paidAmount: actualPaidAmount,
-        dueAmount: actualDueAmount,
-        discount: discountAmount,
-      })
-
-      Toast.show({
-        type: "success",
-        text1: "Rent payment added successfully",
-      })
-
-      // Refresh rent history
-      await fetchRentHistory()
-
-      // Reset form
-      setShowRentModal(false)
-      setPaidAmount("")
-      setDueAmount("")
-      setDiscount("0")
-      setSelectedStartDate(new Date())
-      setSelectedEndDate(new Date())
-    } catch (error: any) {
-      console.error("Error adding rent:", error)
+    } catch (error) {
+      console.error("Error adding rent:", error);
       Toast.show({
         type: "error",
-        text1: error.message || "Failed to add rent payment",
-      })
+        text1: "Failed to add rent payment",
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowStartDatePicker(false)
+    setShowStartDatePicker(false);
     if (selectedDate) {
-      setSelectedStartDate(selectedDate)
-      // Set end date to one month after the selected start date
-      const newEndDate = new Date(selectedDate)
-      newEndDate.setMonth(newEndDate.getMonth() + 1)
-      setSelectedEndDate(newEndDate)
+      setSelectedStartDate(selectedDate);
+      // Set end date to 30 days after the selected start date
+      const newEndDate = new Date(selectedDate);
+      newEndDate.setDate(newEndDate.getDate() + 30);
+      setSelectedEndDate(newEndDate);
     }
-  }
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndDatePicker(false);
+    if (selectedDate) {
+      // Ensure end date is not before start date
+      if (selectedDate < selectedStartDate) {
+        Toast.show({
+          type: "error",
+          text1: "End date cannot be before start date",
+        });
+        return;
+      }
+      setSelectedEndDate(selectedDate);
+    }
+  };
 
   if (loading) {
     return (
@@ -485,13 +523,25 @@ const MemberDetails: React.FC = () => {
         <DetailRow label="Email" value={member.email} icon={<MaterialIcons name="email" size={16} color="#02c39a" />} />
         {seat ? (
           <DetailRow
-            label="Seat Number"
-            value={seat.seatId}
+            label="Room"
+            value={[seat.roomNumber, seat.seatId].join(" - ")}
             icon={<MaterialIcons name="chair" size={16} color="#02c39a" />}
           />
+          
         ) : (
-          <DetailRow label="Seat Number" value="N/A" icon={<MaterialIcons name="chair" size={16} color="#02c39a" />} />
+          <DetailRow label="Room" value="N/A" icon={<MaterialIcons name="chair" size={16} color="#02c39a" />} />
         )}
+         {seat ? (
+          <DetailRow
+            label="Room Rent"
+            value={seat.rent}
+            icon={<MaterialIcons name="chair" size={16} color="#02c39a" />}
+          />
+          
+        ) : (
+          <DetailRow label="Room Rent" value="N/A" icon={<MaterialIcons name="money" size={16} color="#02c39a" />} />
+        )}
+        
       </View>
 
       {/* Attendance Report */}
@@ -612,6 +662,7 @@ const MemberDetails: React.FC = () => {
                   mode="date"
                   display={Platform.OS === "ios" ? "spinner" : "default"}
                   onChange={handleStartDateChange}
+                  minimumDate={new Date()} // Can't select past dates
                 />
               )}
             </View>
@@ -629,12 +680,8 @@ const MemberDetails: React.FC = () => {
                   value={selectedEndDate}
                   mode="date"
                   display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={(event, selectedDate) => {
-                    setShowEndDatePicker(false)
-                    if (selectedDate) {
-                      setSelectedEndDate(selectedDate)
-                    }
-                  }}
+                  onChange={handleEndDateChange}
+                  minimumDate={selectedStartDate} // Can't select date before start date
                 />
               )}
             </View>
@@ -642,15 +689,21 @@ const MemberDetails: React.FC = () => {
             <View style={styles.amountSection}>
               <View style={styles.amountRow}>
                 <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
-                  <Text style={styles.amountLabel}>Room Rent</Text>
-                  <Text style={styles.amountValue}>₹{seatRent}</Text>
+                  <Text style={styles.amountLabel}>Paid Amount *</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="Enter amount"
+                    keyboardType="numeric"
+                    value={paidAmount}
+                    onChangeText={setPaidAmount}
+                  />
                 </View>
 
                 <View style={[styles.inputGroup, styles.flex1]}>
                   <Text style={styles.amountLabel}>Discount</Text>
                   <TextInput
                     style={styles.amountInput}
-                    placeholder="00"
+                    placeholder="Enter discount"
                     keyboardType="numeric"
                     value={discount}
                     onChangeText={setDiscount}
@@ -659,22 +712,15 @@ const MemberDetails: React.FC = () => {
               </View>
 
               <View style={styles.amountRow}>
-                <View style={[styles.inputGroup, styles.flex1, styles.marginRight]}>
-                  <Text style={styles.amountLabel}>Paid Amount *</Text>
+                <View style={[styles.inputGroup, styles.flex1]}>
+                  <Text style={styles.amountLabel}>Due Amount</Text>
                   <TextInput
                     style={styles.amountInput}
-                    placeholder="0.00"
+                    placeholder="Enter due amount"
                     keyboardType="numeric"
-                    value={paidAmount}
-                    onChangeText={setPaidAmount}
+                    value={dueAmount}
+                    onChangeText={setDueAmount}
                   />
-                </View>
-
-                <View style={[styles.inputGroup, styles.flex1]}>
-                  <Text style={[styles.amountLabel, styles.dueAmount]}>Due Amount</Text>
-                  <Text style={[styles.amountValue, styles.dueAmount]}>
-                    ₹{seatRent - (Number(paidAmount) || 0) - (Number(discount) || 0)}
-                  </Text>
                 </View>
               </View>
             </View>

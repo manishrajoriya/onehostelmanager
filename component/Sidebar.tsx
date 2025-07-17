@@ -5,9 +5,9 @@ import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import MembersDashboard from "./MemberDashbord"
 import MemberProfileCard from "./member/MemberProfileCard"
-import ShiftForm from "./ShiftForm"
+
 import AddMemberForm from "./member/AddMemberForm"
-import ShiftDetails from "./ShiftDetails"
+
 import Finance from "./Finance"
 import AddSeatsPage from "./Seat"
 import AttendancePage from "./member/Attendance"
@@ -114,21 +114,7 @@ const CustomDrawerContent = (props: any) => {
           isActive={activeRoute === "MemberPayment"}
         />
 
-        {/* Room Plan Section */}
-        <Text style={styles.sectionTitle}>Room Plan</Text>
-        <DrawerItem
-          label="Add Plan"
-          icon="calendar"
-          onPress={() => props.navigation.navigate("ShiftForm")}
-          isActive={activeRoute === "ShiftForm"}
-        />
-        <DrawerItem
-          label="Plan Details"
-          icon="list"
-          onPress={() => props.navigation.navigate("ShiftDetails")}
-          isActive={activeRoute === "ShiftDetails"}
-        />
-
+      
         {/* Finance Section */}
         <Text style={styles.sectionTitle}>Subscription</Text>
         <DrawerItem
@@ -231,8 +217,6 @@ const Sidebar = () => {
       <Drawer.Screen name="AllotSeat" component={AllocateSeatsPage} options={{ title: "Allot Room" }}/>
       <Drawer.Screen name="Profile" component={MemberProfileCard} options={{ title: "Profile" }}/>
       <Drawer.Screen name="MemberPayment" component={MemberPaymentList} options={{ title: "Member Payment" }}/>
-      <Drawer.Screen name="ShiftForm" component={ShiftForm} options={{ title: "Add Plan" }}/>
-      <Drawer.Screen name="ShiftDetails" component={ShiftDetails} options={{ title: "Plan Details" }}/>
       <Drawer.Screen name="Finance" component={Finance} options={{ title: "Finance" }}/>
       {/* Removed Pricing Screen */}
       <Drawer.Screen name="Attendance" component={AttendancePage} options={{ title: "Attendance" }}/>

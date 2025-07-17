@@ -238,8 +238,8 @@ export async function getMembers({ pageSize, lastVisible, currentUser, libraryId
       address: doc.data().address,
       contactNumber: doc.data().contactNumber,
       email: doc.data().email,
-      addmissionDate: doc.data().addmissionDate.toDate(),
-      expiryDate: doc.data().expiryDate.toDate(),
+      addmissionDate: doc.data().addmissionDate,
+      expiryDate: doc.data().expiryDate,
       profileImage: doc.data().profileImage,
       document: doc.data().document,
       dueAmount: doc.data().dueAmount,
@@ -249,6 +249,7 @@ export async function getMembers({ pageSize, lastVisible, currentUser, libraryId
       advanceAmount: doc.data().advanceAmount,
       planId: doc.data().planId,
       plan: doc.data().plan,
+      profession: doc.data().profession,
       createdAt: doc.data().createdAt,
       updatedAt: doc.data().updatedAt,
     }));
@@ -351,7 +352,7 @@ export async function getMemberById({ id }: { id: string }) {
       updatedAt: memberData.updatedAt
     }
   } catch (error: any) {
-    console.error("Unable to get member:", error.message)
+    // console.error("Unable to get member in getMemberById:", error.message)
     throw error
   }
 }

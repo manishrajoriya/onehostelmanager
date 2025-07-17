@@ -263,7 +263,7 @@ const AllocateSeatsPage: React.FC = () => {
       console.log("Member details fetched:", memberDetails);
       setSelectedMemberDetails(memberDetails);
     } catch (error: any) {
-      console.error("Error fetching member details:", error);
+      // console.error("Error fetching member details:", error);
       Alert.alert(
         "Error",
         `Failed to load member details: ${error.message || "Unknown error"}`

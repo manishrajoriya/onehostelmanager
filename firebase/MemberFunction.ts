@@ -85,7 +85,7 @@ export const addMonthlyRent = async ({
       paidAmount,
       dueAmount,
       discount,
-      paymentDate: Timestamp.now(),
+      paymentDate: new Date(),
     });
   } catch (error) {
     console.error("Error adding rent payment:", error);

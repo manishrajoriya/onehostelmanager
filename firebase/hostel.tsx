@@ -512,14 +512,74 @@ export const addMonthlyRent = async ({
 }) => {
   try {
     const rentRef = collection(db, `tenants/${memberId}/rentPayments`);
+    
+    // Get the latest rent payment to check for existing due amount
+    const q = query(rentRef, orderBy("paymentDate", "desc"), limit(1));
+    const querySnapshot = await getDocs(q);
+    
+    let remainingDueAmount = 0;
+    let adjustedPaidAmount = paidAmount;
+    let previousDueAmount = 0;
+    let amountAppliedToDue = 0;
+    let amountAppliedToNewRent = 0;
+    
+    if (!querySnapshot.empty) {
+      const lastPayment = querySnapshot.docs[0].data();
+      previousDueAmount = lastPayment.dueAmount || 0;
+      remainingDueAmount = previousDueAmount;
+      
+      // If there's existing due amount, adjust the paid amount
+      if (remainingDueAmount > 0) {
+        if (paidAmount >= remainingDueAmount) {
+          // If new payment can cover the due amount
+          amountAppliedToDue = remainingDueAmount;
+          amountAppliedToNewRent = paidAmount - remainingDueAmount;
+          remainingDueAmount = 0;
+          adjustedPaidAmount = amountAppliedToNewRent;
+        } else {
+          // If new payment can't fully cover the due amount
+          amountAppliedToDue = paidAmount;
+          amountAppliedToNewRent = 0;
+          remainingDueAmount -= paidAmount;
+          adjustedPaidAmount = 0;
+        }
+      } else {
+        amountAppliedToNewRent = paidAmount;
+      }
+    } else {
+      amountAppliedToNewRent = paidAmount;
+    }
+
+    // Add the new rent payment
     await addDoc(rentRef, {
       startDate,
       endDate,
-      paidAmount,
-      dueAmount,
+      paidAmount: adjustedPaidAmount,
+      dueAmount: remainingDueAmount > 0 ? remainingDueAmount : dueAmount,
       discount,
-      paymentDate: Timestamp.now(),
+      paymentDate: new Date(),
+      previousDueAmount,
+      totalPaidAmount: paidAmount,
+      amountAppliedToDue,
+      amountAppliedToNewRent,
     });
+
+    return {
+      success: true,
+      message: "Rent payment added successfully",
+      paymentDetails: {
+        totalPaid: paidAmount,
+        previousDueAmount,
+        amountAppliedToDue,
+        amountAppliedToNewRent,
+        remainingDueAmount,
+        newDueAmount: remainingDueAmount > 0 ? remainingDueAmount : dueAmount,
+        period: {
+          startDate,
+          endDate
+        }
+      }
+    };
   } catch (error) {
     console.error("Error adding rent payment:", error);
     throw error;

@@ -5,6 +5,7 @@ import { ActionButtons } from "./MemberCardActionButton"
 import type { MemberDetails } from "@/types/MemberProfile"
 import { fetchSeats } from "@/firebase/functions"
 import useStore from "@/hooks/store"
+import { formatDate } from "./AddMemberForm"
 
 interface RentDetails {
   startDate: string;
@@ -34,18 +35,24 @@ const getInitials = (name: string) => {
     .toUpperCase()
 }
 
-const formatDate = (date: Date | string): string => {
-  const parsedDate = new Date(date)
+const safeFormatDate = (dateString: string | Date | { seconds: number; nanoseconds: number }): string => {
+  try {
+    let date: Date;
+    
+    if (typeof dateString === 'object' && 'seconds' in dateString) {
+      // Handle Firebase Timestamp
+      date = new Date(dateString.seconds * 1000);
+    } else {
+      date = new Date(dateString);
+    }
 
-  if (isNaN(parsedDate.getTime())) {
-    return "Invalid Date"
+    if (isNaN(date.getTime())) {
+      return "Invalid Date";
+    }
+    return formatDate(date);
+  } catch (error) {
+    return "Invalid Date";
   }
-
-  const day = parsedDate.getDate().toString().padStart(2, '0')
-  const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0')
-  const year = parsedDate.getFullYear()
-
-  return `${day}/${month}/${year}`
 }
 
 const MemberCard: React.FC<MemberCardProps> = React.memo(
@@ -85,9 +92,10 @@ const MemberCard: React.FC<MemberCardProps> = React.memo(
       }
       
       const today = new Date();
-      console.log("today:", today);
-      const endDate = new Date(rentDetails.endDate);
-      console.log("endDate:", endDate);
+      
+      // Parse the date string in DD/MM/YYYY format
+      const [day, month, year] = rentDetails.endDate.split('/').map(Number);
+      const endDate = new Date(year, month - 1, day); // month is 0-based in JavaScript
       
       const isActive = endDate > today;
       const isPaid = rentDetails.dueAmount === 0;
@@ -103,7 +111,7 @@ const MemberCard: React.FC<MemberCardProps> = React.memo(
 
       if (isPaid) {
         return { 
-          status: "Active & Paid", 
+          status: "Paid", 
           style: styles.paidAmount, 
           badgeColor: "#DCFCE7", 
           textColor: "#16A34A" 
@@ -111,7 +119,7 @@ const MemberCard: React.FC<MemberCardProps> = React.memo(
       }
 
       return { 
-        status: "Active & Pending", 
+        status: "Pending", 
         style: styles.dueAmount, 
         badgeColor: "#FEF3C7", 
         textColor: "#D97706" 
@@ -157,21 +165,21 @@ const MemberCard: React.FC<MemberCardProps> = React.memo(
             <>
               <View style={styles.planItem}>
                 <Text style={styles.planLabel}>Joining Date</Text>
-                <Text style={styles.planValue}>{formatDate(member.addmissionDate)}</Text>
+                <Text style={styles.planValue}>{safeFormatDate(member.addmissionDate)}</Text>
               </View>
               <View style={styles.planItem}>
                 <Text style={styles.planLabel}>Last Payment</Text>
-                <Text style={styles.planValue}>{formatDate(rentDetails.paymentDate)}</Text>
+                <Text style={styles.planValue}>{safeFormatDate(rentDetails.paymentDate)}</Text>
               </View>
               <View style={styles.planItem}>
-                <Text style={styles.planLabel}>Status</Text>
-                <Text style={[styles.planValue, style]}>{status}</Text>
+                <Text style={styles.planLabel}>End Payment</Text>
+                <Text style={styles.planValue}>{(rentDetails.endDate)}</Text>
               </View>
             </>
           ) : (
             <View style={styles.planItem}>
               <Text style={styles.planLabel}>Joining Date</Text>
-              <Text style={styles.planValue}>{formatDate(member.addmissionDate)}</Text>
+              <Text style={styles.planValue}>{safeFormatDate(member.addmissionDate)}</Text>
             </View>
           )}
         </View>

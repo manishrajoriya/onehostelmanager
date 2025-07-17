@@ -97,46 +97,31 @@ export default function MembersDashboard() {
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberProfileCard"),
     },
-    {
-      icon: "people",
-      title: "Live Members",
-      value: '',
-      color: "#34A853",
-      style: { backgroundColor: "#fff" },
-      onPress: () => router.push("/memberProfileCard"),
-    },
-    {
-      icon: "person-remove",
-      title: "Inactive Members",
-      value: '',
-      color: "#EA4335",
-      style: { backgroundColor: "#fff" },
-      onPress: () => router.push("/memberProfileCard"),
-    },
+    // {
+    //   icon: "people",
+    //   title: "Live Members",
+    //   value: '',
+    //   color: "#34A853",
+    //   style: { backgroundColor: "#fff" },
+    //   onPress: () => router.push("/memberProfileCard"),
+    // },
+    // {
+    //   icon: "person-remove",
+    //   title: "Inactive Members",
+    //   value: '',
+    //   color: "#EA4335",
+    //   style: { backgroundColor: "#fff" },
+    //   onPress: () => router.push("/memberProfileCard"),
+    // },
     {
       icon: "card",
-      title: "Total Amount",
+      title: "Rent Data",
       value: '',
       color: "#4285F4",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/memberPaymemt"),
     },
-    {
-      icon: "cash",
-      title: "Paid Amount",
-      value: '',
-      color: "#9C27B0",
-      style: { backgroundColor: "#fff" },
-      onPress: () => router.push("/memberPaymemt"),
-    },
-    {
-      icon: "time",
-      title: "Due Amount",
-      value: '',
-      color: "#FB8C00",
-      style: { backgroundColor: "#fff" },
-      onPress: () => router.push("/memberPaymemt"),
-    },
+  
     {
       icon: "trending-up",
       title: "Finance",
@@ -152,7 +137,24 @@ export default function MembersDashboard() {
       color: "#02c39a",
       style: { backgroundColor: "#fff" },
       onPress: () => router.push("/allotseats"),
-    }
+    },
+      {
+      icon: "cash",
+      title: "Paid Amount",
+      value: '',
+      color: "#9C27B0",
+      style: { backgroundColor: "#fff" },
+      onPress: () => router.push("/memberPaymemt"),
+    },
+    {
+      icon: "time",
+      title: "Due Amount",
+      value: '',
+      color: "#FB8C00",
+      style: { backgroundColor: "#fff" },
+      onPress: () => router.push("/memberPaymemt"),
+    },
+     
   ]
 
    if (isLoading) {
